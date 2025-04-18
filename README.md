@@ -3,7 +3,7 @@
 A game created for the GameDevJS 2025 jam with the theme "Balance".
 
 ## Description
-CURRENTLY A WORK IN PROGRESS
+CURRENTLY A WORK IN PROGRESS\
 QWOP-inspired game where you over-control a character with independently operated limbs, trying to maintain balance while fighting off enemies and making your way to a safe house/spot.
 
 ## Controls
