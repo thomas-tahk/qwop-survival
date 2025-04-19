@@ -1,24 +1,38 @@
 class GameScene extends Phaser.Scene {
     constructor() {
         super('GameScene');
+        // add debug display
+        this.debugText = null;
     }
 
     create() {
         // Create ground
-        this.ground = this.matter.add.image(400, 580, 'ground', null, { isStatic: true });
+        this.ground = this.matter.add.image(400, 580, 'ground', null, {
+            isStatic: true,
+            label: 'ground'
+        });
         this.ground.setScale(1, 1);
 
+        // Calculate ground top position for placing character
+        const groundTop = this.ground.y - this.ground.height / 2;
+
         // Create character parts and joints
-        this.createCharacter();
+        this.createCharacter(200, groundTop);
 
         // Set up controls
         this.setupControls();
 
         // Add a single enemy
-        this.enemy = this.matter.add.image(600, 500, 'enemy');
+        this.enemy = this.matter.add.image(600, groundTop - 30, 'enemy', null, {
+            label: 'enemy'
+        });
+        this.enemy.health = 3;
 
         // Add safehouse
-        this.safehouse = this.matter.add.image(700, 500, 'safehouse', null, { isStatic: true });
+        this.safehouse = this.matter.add.image(700, groundTop - 40, 'safehouse', null, {
+            isStatic: true,
+            label: 'safehouse'
+        });
 
         // Set up collision detection
         this.setupCollisions();
@@ -29,9 +43,22 @@ class GameScene extends Phaser.Scene {
             fill: '#fff',
             align: 'center'
         }).setOrigin(0.5);
+
+        // Add debug text to show why game resets
+        this.debugText = this.add.text(400, 100, '', {
+            fontSize: '14px',
+            fill: '#ff0',
+            backgroundColor: '#333',
+            padding: { x: 10, y: 5 }
+        }).setOrigin(0.5);
+
+        // Game is active flag
+        this.gameActive = true;
     }
 
     update() {
+        if (!this.gameActive) return;
+
         // Handle character balance
         this.updateBalance();
 
@@ -40,47 +67,64 @@ class GameScene extends Phaser.Scene {
 
         // Check win/lose conditions
         this.checkGameState();
+
+        // Update debug text
+        this.updateDebugText();
     }
 
     // Create character with connected body parts
-    createCharacter() {
-        // Create body parts
-        const torsoX = 200;
-        const torsoY = 400;
+    createCharacter(x, groundY) {
+        // Create body parts - position them so feet are on ground
+        // Assuming leg height is 60, torso is 80
+        const legHeight = 60;
+        const torsoHeight = 80;
+        const torsoY = groundY - legHeight - torsoHeight/2;
 
-        this.torso = this.matter.add.image(torsoX, torsoY, 'torso');
-        this.head = this.matter.add.image(torsoX, torsoY - 50, 'head');
-        this.leftArm = this.matter.add.image(torsoX - 40, torsoY - 10, 'arm');
-        this.rightArm = this.matter.add.image(torsoX + 40, torsoY - 10, 'arm');
-        this.leftLeg = this.matter.add.image(torsoX - 15, torsoY + 50, 'leg');
-        this.rightLeg = this.matter.add.image(torsoX + 15, torsoY + 50, 'leg');
+        this.torso = this.matter.add.image(x, torsoY, 'torso', null, {
+            label: 'torso'
+        });
+
+        this.head = this.matter.add.image(x, torsoY - 40, 'head', null, {
+            label: 'head'
+        });
+
+        this.leftArm = this.matter.add.image(x - 40, torsoY, 'arm', null, {
+            label: 'leftArm'
+        });
+        this.rightArm = this.matter.add.image(x + 40, torsoY, 'arm', null, {
+            label: 'rightArm'
+        });
+
+        this.leftLeg = this.matter.add.image(x - 15, torsoY + 50, 'leg', null, {
+            label: 'leftLeg'
+        });
+        this.rightLeg = this.matter.add.image(x + 15, torsoY + 50, 'leg', null, {
+            label: 'rightLeg'
+        });
 
         // Connect parts with joints
         // Head to torso
-        this.matter.add.joint(this.head, this.torso, 0, 0.9, {
-            pointA: { x: 0, y: 20 },
-            pointB: { x: 0, y: -30 }
+        this.matter.add.joint(this.leftArm, this.torso, 0, 0.7, {
+            pointA: { x: 25, y: 0 },
+            pointB: { x: -20, y: -10 }
         });
-
-        // Arms to torso
-        this.matter.add.joint(this.leftArm, this.torso, 0, 0.9, {
-            pointA: { x: 20, y: 0 },
-            pointB: { x: -30, y: -20 }
-        });
-        this.matter.add.joint(this.rightArm, this.torso, 0, 0.9, {
-            pointA: { x: -20, y: 0 },
-            pointB: { x: 30, y: -20 }
+        this.matter.add.joint(this.rightArm, this.torso, 0, 0.7, {
+            pointA: { x: -25, y: 0 },
+            pointB: { x: 20, y: -10 }
         });
 
         // Legs to torso
-        this.matter.add.joint(this.leftLeg, this.torso, 0, 0.9, {
+        this.matter.add.joint(this.leftLeg, this.torso, 0, 0.7, {
             pointA: { x: 0, y: -25 },
             pointB: { x: -15, y: 30 }
         });
-        this.matter.add.joint(this.rightLeg, this.torso, 0, 0.9, {
+        this.matter.add.joint(this.rightLeg, this.torso, 0, 0.7, {
             pointA: { x: 0, y: -25 },
             pointB: { x: 15, y: 30 }
         });
+
+        // Group body parts for easier access
+        this.bodyParts = [this.torso, this.head, this.leftArm, this.rightArm, this.leftLeg, this.rightLeg];
     }
 
     // Set up key controls for limbs
@@ -109,7 +153,7 @@ class GameScene extends Phaser.Scene {
     // Update character balance
     updateBalance() {
         // Apply forces based on key presses
-        const force = 0.005;
+        const force = 0.03;
 
         // Left arm control
         if (this.leftArmKeys.up.isDown) {
@@ -143,11 +187,13 @@ class GameScene extends Phaser.Scene {
             this.rightLeg.applyForce({ x: 0, y: force });
         }
 
-        // Basic balance check
-        // If torso falls below a certain height or tilts too much, game over
-        if (this.torso.y > 550 || Math.abs(this.torso.rotation) > 1.5) {
-            console.log('Character fell over!');
-            this.scene.restart();
+        // Basic balance check - only check if torso is clearly fallen over
+        // Increased threshold to avoid premature resets
+        if (this.torso.y > this.ground.y - 20) {
+            this.gameOver("Character fell on the ground!");
+        }
+        else if (Math.abs(this.torso.rotation) > 1.8) {
+            this.gameOver("Character fell over!");
         }
     }
 
@@ -155,6 +201,8 @@ class GameScene extends Phaser.Scene {
     setupCollisions() {
         // Check for collisions between limbs and enemies
         this.matter.world.on('collisionstart', (event) => {
+            if (!this.gameActive) return;
+
             event.pairs.forEach((pair) => {
                 const bodyA = pair.bodyA;
                 const bodyB = pair.bodyB;
@@ -192,10 +240,7 @@ class GameScene extends Phaser.Scene {
     // Enemy damage function
     damageEnemy(enemy) {
         // Simple enemy health system
-        if (!enemy.health) {
-            enemy.health = 3;
-        }
-
+        if (!enemy.active || !this.gameActive) return;
         enemy.health--;
 
         // Visual feedback
@@ -216,7 +261,7 @@ class GameScene extends Phaser.Scene {
         // Simple AI: move toward player
         if (this.enemy && this.enemy.active) {
             const dx = this.torso.x - this.enemy.x;
-            const speed = 0.0002;
+            const speed = 0.001;
             this.enemy.applyForce({ x: Math.sign(dx) * speed, y: 0 });
         }
     }
