@@ -153,7 +153,7 @@ class GameScene extends Phaser.Scene {
     // Update character balance
     updateBalance() {
         // Apply forces based on key presses
-        const force = 0.03;
+        const force = 0.01;
 
         // Left arm control
         if (this.leftArmKeys.up.isDown) {
@@ -276,19 +276,81 @@ class GameScene extends Phaser.Scene {
         if (this.enemy && this.enemy.active) {
             const distance = Phaser.Math.Distance.Between(this.torso.x, this.torso.y, this.enemy.x, this.enemy.y);
             if (distance < 50) {
-                console.log('Enemy caught you! Game over!');
-                this.add.text(400, 300, 'GAME OVER', {
-                    fontSize: '48px',
-                    fill: '#fff',
-                    backgroundColor: '#000',
-                    padding: { x: 20, y: 10 }
-                }).setOrigin(0.5);
-
-                // Restart the scene after a delay
-                this.time.delayedCall(3000, () => {
-                    this.scene.restart();
-                });
+                this.gameOver("Enemy caught you!");
             }
         }
     }
+
+    updateDebugText() {
+        // Show position and rotation of torso
+        if (this.debugText && this.torso) {
+            this.debugText.setText(
+                `Torso: x=${Math.round(this.torso.x)}, y=${Math.round(this.torso.y)}, rotation=${this.torso.rotation.toFixed(2)}\n` +
+                `Enemy: ${this.enemy && this.enemy.active ? 'active' : 'defeated'}, health: ${this.enemy ? this.enemy.health : 0}`
+            );
+        }
+    }
+
+    gameOver(reason) {
+        if (!this.gameActive) return;
+
+        this.gameActive = false;
+        console.log('Game over:', reason);
+
+        this.add.text(400, 300, 'GAME OVER', {
+            fontSize: '48px',
+            fill: '#fff',
+            backgroundColor: '#000',
+            padding: { x: 20, y: 10 }
+        }).setOrigin(0.5);
+
+        // Add reason text
+        this.add.text(400, 350, reason, {
+            fontSize: '24px',
+            fill: '#fff',
+            backgroundColor: '#000',
+            padding: { x: 10, y: 5 }
+        }).setOrigin(0.5);
+
+        // Add restart instruction
+        this.add.text(400, 400, 'Press SPACE to try again', {
+            fontSize: '20px',
+            fill: '#fff',
+            backgroundColor: '#000',
+            padding: { x: 10, y: 5 }
+        }).setOrigin(0.5);
+
+        // Allow restart with spacebar
+        this.input.keyboard.once('keydown-SPACE', () => {
+            this.scene.restart();
+        });
+    }
+
+    winGame() {
+        if (!this.gameActive) return;
+
+        this.gameActive = false;
+        console.log('You win!');
+
+        this.add.text(400, 300, 'YOU WIN!', {
+            fontSize: '48px',
+            fill: '#fff',
+            backgroundColor: '#00aa00',
+            padding: { x: 20, y: 10 }
+        }).setOrigin(0.5);
+
+        // Add restart instruction
+        this.add.text(400, 400, 'Press SPACE to play again', {
+            fontSize: '20px',
+            fill: '#fff',
+            backgroundColor: '#00aa00',
+            padding: { x: 10, y: 5 }
+        }).setOrigin(0.5);
+
+        // Allow restart with spacebar
+        this.input.keyboard.once('keydown-SPACE', () => {
+            this.scene.restart();
+        });
+    }
+
 }
