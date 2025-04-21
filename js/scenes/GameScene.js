@@ -5,6 +5,7 @@ class GameScene extends Phaser.Scene {
         this.gameActive = true;
         this.pauseKey = null;
         this.resetKey = null;
+        this.isPaused = false;
     }
 
     create() {
@@ -12,6 +13,7 @@ class GameScene extends Phaser.Scene {
         this.ground = this.matter.add.image(400, 580, 'ground', null, {
             isStatic: true,
             label: 'ground',
+            friction: 0.5, // Add friction to the ground
             collisionFilter: { group: 0, category: 1, mask: 255 }
         });
         this.ground.setScale(1, 1);
@@ -42,9 +44,51 @@ class GameScene extends Phaser.Scene {
         this.setupDebugInfo();
     }
 
+    // display control labels on limbs
+    setupLimbLabels() {
+        // Create a label for each limb showing its controls
+        const createLabel = (limb, text) => {
+            if (!limb || !limb.active) return;
+
+            const style = {
+                fontSize: '16px',
+                fill: '#fff',
+                backgroundColor: '#000',
+                padding: { x: 3, y: 2 }
+            };
+
+            const label = this.add.text(limb.x, limb.y, text, style);
+            label.setOrigin(0.5);
+            label.setDepth(10);
+
+            // Store reference to update position
+            limb.controlLabel = label;
+        };
+
+        createLabel(this.character.parts.leftArm, "Q/A");
+        createLabel(this.character.parts.rightArm, "P/L");
+        createLabel(this.character.parts.leftLeg, "W/S");
+        createLabel(this.character.parts.rightLeg, "O/K");
+
+        // Debug text in corner instead of overlapping
+        this.debugText = this.add.text(20, 20, '', {
+            fontSize: '14px',
+            fill: '#ff0',
+            backgroundColor: '#333',
+            padding: { x: 5, y: 5 }
+        });
+
+        // Add instructions in a different location
+        this.add.text(400, 30, 'ESC to pause, R to reset', {
+            fontSize: '16px',
+            fill: '#fff'
+        }).setOrigin(0.5);
+    }
+
     setupGameStateManagement() {
         // Game is active by default
         this.gameActive = true;
+        this.isPaused = false;
 
         // Add pause key (ESC)
         this.pauseKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
@@ -83,16 +127,11 @@ class GameScene extends Phaser.Scene {
     }
 
     togglePause() {
-        if (this.scene.isPaused('GameScene')) {
-            this.scene.resume('GameScene');
+        this.isPaused = !this.isPaused;
 
-            // Remove pause text if it exists
-            if (this.pauseText) {
-                this.pauseText.destroy();
-                this.pauseText = null;
-            }
-        } else {
-            this.scene.pause('GameScene');
+        if (this.isPaused) {
+            // Pause the game
+            this.matter.world.enabled = false;
 
             // Add pause text
             this.pauseText = this.add.text(400, 300, 'PAUSED\nPress ESC to resume', {
@@ -102,15 +141,27 @@ class GameScene extends Phaser.Scene {
                 padding: { x: 20, y: 10 },
                 align: 'center'
             }).setOrigin(0.5);
+            this.pauseText.setDepth(100);
+        } else {
+            // Resume the game
+            this.matter.world.enabled = true;
+
+            // Remove pause text if it exists
+            if (this.pauseText) {
+                this.pauseText.destroy();
+                this.pauseText = null;
+            }
         }
     }
 
     resetGame() {
+        // Make sure to unpause when resetting
+        this.isPaused = false;
         this.scene.restart();
     }
 
     update() {
-        if (!this.gameActive) return;
+        if (!this.gameActive || this.isPaused) return;
 
         // Handle character control
         this.handleCharacterControl();
@@ -123,6 +174,19 @@ class GameScene extends Phaser.Scene {
 
         // Update debug text
         this.updateDebugText();
+
+        // Update limb labels
+        this.updateLimbLabels();
+    }
+
+    // method to update the limb labels
+    updateLimbLabels() {
+        // Update position of each label to follow its limb
+        Object.values(this.character.parts).forEach(part => {
+            if (part && part.active && part.controlLabel) {
+                part.controlLabel.setPosition(part.x, part.y);
+            }
+        });
     }
 
     createCharacter(x, groundY) {
@@ -134,82 +198,86 @@ class GameScene extends Phaser.Scene {
 
         // Calculate positions
         const legHeight = 60;
-        const torsoY = groundY - legHeight - 40; // Position torso above ground
+        const torsoY = groundY - legHeight - 60; // Position torso above ground
 
-        // Create torso as the main body
+        // Create torso with increased stability values
         this.character.parts.torso = this.matter.add.image(x, torsoY, 'torso', null, {
             label: 'torso',
-            density: 0.008,  // Make torso heavier for stability
-            frictionAir: 0.03, // Add air friction to reduce spinning
+            density: 0.01,  // Heavier torso for stability
+            frictionAir: 0.05, // More air friction to reduce movement
+            friction: 0.2, // Add friction to reduce sliding
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
-        // Create head with stronger connection
-        this.character.parts.head = this.matter.add.image(x, torsoY - 40, 'head', null, {
+        // Create head at top of torso
+        this.character.parts.head = this.matter.add.image(x, torsoY - 50, 'head', null, {
             label: 'head',
             density: 0.005,
             frictionAir: 0.05,
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
-        // Create limbs
-        this.character.parts.leftArm = this.matter.add.image(x - 40, torsoY, 'arm', null, {
+        // Create limbs with better stability
+        this.character.parts.leftArm = this.matter.add.image(x - 40, torsoY - 20, 'arm', null, {
             label: 'leftArm',
-            density: 0.003,
-            frictionAir: 0.02,
+            density: 0.004,
+            frictionAir: 0.03,
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
-        this.character.parts.rightArm = this.matter.add.image(x + 40, torsoY, 'arm', null, {
+        this.character.parts.rightArm = this.matter.add.image(x + 40, torsoY - 20, 'arm', null, {
             label: 'rightArm',
-            density: 0.003,
-            frictionAir: 0.02,
+            density: 0.004,
+            frictionAir: 0.03,
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
         this.character.parts.leftLeg = this.matter.add.image(x - 15, torsoY + 50, 'leg', null, {
             label: 'leftLeg',
-            density: 0.005,
-            frictionAir: 0.02,
+            density: 0.006,
+            frictionAir: 0.03,
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
         this.character.parts.rightLeg = this.matter.add.image(x + 15, torsoY + 50, 'leg', null, {
             label: 'rightLeg',
-            density: 0.005,
-            frictionAir: 0.02,
+            density: 0.006,
+            frictionAir: 0.03,
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
-        // Create stronger joints
-        // Head to torso - stronger joint
+        // Improved joints - fix head connection at the TOP of torso
         this.matter.add.joint(
             this.character.parts.head,
             this.character.parts.torso,
-            10, // stiffness - higher value for more rigid joint
-            0.2  // damping - higher value to reduce oscillation
+            15, // Increased stiffness for head
+            0.4,  // Lower damping to reduce oscillation
+            {
+                pointA: { x: 0, y: 15 }, // Bottom of head
+                pointB: { x: 0, y: -40 }  // TOP of torso
+            }
         );
 
         // Arms to torso
         this.matter.add.joint(
             this.character.parts.leftArm,
             this.character.parts.torso,
-            5,
-            0.5,
+            8,
+            0.4,
             {
                 pointA: { x: 25, y: 0 },
-                pointB: { x: -20, y: -15 }
+                pointB: { x: -20, y: -30 }
             }
         );
 
         this.matter.add.joint(
             this.character.parts.rightArm,
             this.character.parts.torso,
-            5,
-            0.5,
+            8,
+            0.4,
             {
                 pointA: { x: -25, y: 0 },
-                pointB: { x: 20, y: -15 }
+                pointB: { x: 20, y: -30 } // Higher up on torso
             }
         );
 
@@ -217,8 +285,8 @@ class GameScene extends Phaser.Scene {
         this.matter.add.joint(
             this.character.parts.leftLeg,
             this.character.parts.torso,
-            5,
-            0.5,
+            8,
+            0.4,
             {
                 pointA: { x: 0, y: -25 },
                 pointB: { x: -15, y: 30 }
@@ -228,8 +296,8 @@ class GameScene extends Phaser.Scene {
         this.matter.add.joint(
             this.character.parts.rightLeg,
             this.character.parts.torso,
-            5,
-            0.5,
+            8,
+            0.4,
             {
                 pointA: { x: 0, y: -25 },
                 pointB: { x: 15, y: 30 }
@@ -300,7 +368,7 @@ class GameScene extends Phaser.Scene {
     handleCharacterControl() {
         // Apply controlled forces to limbs
         // Use a smaller force and add cooldown to prevent spinning
-        const force = 0.01;
+        const force = 0.03;
 
         // Process each limb control
         this.applyLimbControl('leftArm', force);
@@ -341,7 +409,7 @@ class GameScene extends Phaser.Scene {
 
             // Set cooldown if force was applied
             if (forceApplied) {
-                limb.cooldown = 5; // Adjust this value to control responsiveness
+                limb.cooldown = 2; // Adjust this value to control responsiveness
             }
         }
     }
@@ -531,7 +599,7 @@ class GameScene extends Phaser.Scene {
             fill: '#fff',
             backgroundColor: '#880000',
             padding: { x: 20, y: 10 }
-        }).setOrigin(0.5);
+        }).setOrigin(0.5).setDepth(100);
 
         // Add reason text
         this.add.text(400, 350, reason, {
@@ -539,7 +607,7 @@ class GameScene extends Phaser.Scene {
             fill: '#fff',
             backgroundColor: '#000',
             padding: { x: 10, y: 5 }
-        }).setOrigin(0.5);
+        }).setOrigin(0.5).setDepth(100);
 
         // Add restart instructions
         this.add.text(400, 400, 'Press SPACE to try again', {
@@ -547,11 +615,11 @@ class GameScene extends Phaser.Scene {
             fill: '#fff',
             backgroundColor: '#000',
             padding: { x: 10, y: 5 }
-        }).setOrigin(0.5);
+        }).setOrigin(0.5).setDepth(100);
 
         // Allow restart with spacebar
         this.input.keyboard.once('keydown-SPACE', () => {
-            this.scene.restart();
+            this.resetGame();
         });
     }
 
@@ -561,13 +629,16 @@ class GameScene extends Phaser.Scene {
         this.gameActive = false;
         console.log('You win!');
 
+        // Freeze physics
+        this.matter.world.enabled = false;
+
         // Add win text
         this.add.text(400, 300, 'YOU WIN!', {
             fontSize: '48px',
             fill: '#fff',
             backgroundColor: '#00aa00',
             padding: { x: 20, y: 10 }
-        }).setOrigin(0.5);
+        }).setOrigin(0.5).setDepth(100);
 
         // Add restart instructions
         this.add.text(400, 400, 'Press SPACE to play again', {
@@ -575,11 +646,11 @@ class GameScene extends Phaser.Scene {
             fill: '#fff',
             backgroundColor: '#00aa00',
             padding: { x: 10, y: 5 }
-        }).setOrigin(0.5);
+        }).setOrigin(0.5).setDepth(100);
 
         // Allow restart with spacebar
         this.input.keyboard.once('keydown-SPACE', () => {
-            this.scene.restart();
+            this.resetGame();
         });
     }
 }
