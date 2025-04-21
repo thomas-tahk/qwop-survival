@@ -1,32 +1,30 @@
 class GameScene extends Phaser.Scene {
     constructor() {
         super('GameScene');
-        // add debug display
         this.debugText = null;
+        this.gameActive = true;
+        this.pauseKey = null;
+        this.resetKey = null;
     }
 
     create() {
-        // Create ground
+        // Set up ground
         this.ground = this.matter.add.image(400, 580, 'ground', null, {
             isStatic: true,
-            label: 'ground'
+            label: 'ground',
+            collisionFilter: { group: 0, category: 1, mask: 255 }
         });
         this.ground.setScale(1, 1);
 
-        // Calculate ground top position for placing character
+        // Create character - placed directly on ground
         const groundTop = this.ground.y - this.ground.height / 2;
-
-        // Create character parts and joints
         this.createCharacter(200, groundTop);
 
         // Set up controls
         this.setupControls();
 
-        // Add a single enemy
-        this.enemy = this.matter.add.image(600, groundTop - 30, 'enemy', null, {
-            label: 'enemy'
-        });
-        this.enemy.health = 3;
+        // Add enemy
+        this.createEnemy(600, groundTop - 30);
 
         // Add safehouse
         this.safehouse = this.matter.add.image(700, groundTop - 40, 'safehouse', null, {
@@ -37,32 +35,87 @@ class GameScene extends Phaser.Scene {
         // Set up collision detection
         this.setupCollisions();
 
+        // Game state management
+        this.setupGameStateManagement();
+
+        // Debug info
+        this.setupDebugInfo();
+    }
+
+    setupGameStateManagement() {
+        // Game is active by default
+        this.gameActive = true;
+
+        // Add pause key (ESC)
+        this.pauseKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+        this.pauseKey.on('down', () => {
+            this.togglePause();
+        });
+
+        // Add reset key (R)
+        this.resetKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
+        this.resetKey.on('down', () => {
+            this.resetGame();
+        });
+
+        // Add pause and reset instructions
+        this.add.text(400, 30, 'ESC to pause, R to reset', {
+            fontSize: '16px',
+            fill: '#fff'
+        }).setOrigin(0.5);
+    }
+
+    setupDebugInfo() {
         // Add instructions text
-        this.add.text(400, 50, 'Use Q/A for left arm, P/L for right arm\nW/S for left leg, O/K for right leg', {
+        this.add.text(400, 70, 'Use Q/A for left arm, P/L for right arm\nW/S for left leg, O/K for right leg', {
             fontSize: '16px',
             fill: '#fff',
             align: 'center'
         }).setOrigin(0.5);
 
-        // Add debug text to show why game resets
-        this.debugText = this.add.text(400, 100, '', {
+        // Add debug text
+        this.debugText = this.add.text(150, 20, '', {
             fontSize: '14px',
             fill: '#ff0',
             backgroundColor: '#333',
-            padding: { x: 10, y: 5 }
-        }).setOrigin(0.5);
+            padding: { x: 5, y: 5 }
+        });
+    }
 
-        // Game is active flag
-        this.gameActive = true;
+    togglePause() {
+        if (this.scene.isPaused('GameScene')) {
+            this.scene.resume('GameScene');
+
+            // Remove pause text if it exists
+            if (this.pauseText) {
+                this.pauseText.destroy();
+                this.pauseText = null;
+            }
+        } else {
+            this.scene.pause('GameScene');
+
+            // Add pause text
+            this.pauseText = this.add.text(400, 300, 'PAUSED\nPress ESC to resume', {
+                fontSize: '32px',
+                fill: '#fff',
+                backgroundColor: '#000',
+                padding: { x: 20, y: 10 },
+                align: 'center'
+            }).setOrigin(0.5);
+        }
+    }
+
+    resetGame() {
+        this.scene.restart();
     }
 
     update() {
         if (!this.gameActive) return;
 
-        // Handle character balance
-        this.updateBalance();
+        // Handle character control
+        this.handleCharacterControl();
 
-        // Update enemy AI
+        // Update enemy movement
         this.updateEnemies();
 
         // Check win/lose conditions
@@ -72,134 +125,229 @@ class GameScene extends Phaser.Scene {
         this.updateDebugText();
     }
 
-    // Create character with connected body parts
     createCharacter(x, groundY) {
-        // Create body parts - position them so feet are on ground
-        // Assuming leg height is 60, torso is 80
+        // Character group - for tracking all body parts
+        this.character = {
+            parts: {},
+            health: 10
+        };
+
+        // Calculate positions
         const legHeight = 60;
-        const torsoHeight = 80;
-        const torsoY = groundY - legHeight - torsoHeight/2;
+        const torsoY = groundY - legHeight - 40; // Position torso above ground
 
-        this.torso = this.matter.add.image(x, torsoY, 'torso', null, {
-            label: 'torso'
-        });
-
-        this.head = this.matter.add.image(x, torsoY - 40, 'head', null, {
-            label: 'head'
-        });
-
-        this.leftArm = this.matter.add.image(x - 40, torsoY, 'arm', null, {
-            label: 'leftArm'
-        });
-        this.rightArm = this.matter.add.image(x + 40, torsoY, 'arm', null, {
-            label: 'rightArm'
+        // Create torso as the main body
+        this.character.parts.torso = this.matter.add.image(x, torsoY, 'torso', null, {
+            label: 'torso',
+            density: 0.008,  // Make torso heavier for stability
+            frictionAir: 0.03, // Add air friction to reduce spinning
+            collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
-        this.leftLeg = this.matter.add.image(x - 15, torsoY + 50, 'leg', null, {
-            label: 'leftLeg'
-        });
-        this.rightLeg = this.matter.add.image(x + 15, torsoY + 50, 'leg', null, {
-            label: 'rightLeg'
+        // Create head with stronger connection
+        this.character.parts.head = this.matter.add.image(x, torsoY - 40, 'head', null, {
+            label: 'head',
+            density: 0.005,
+            frictionAir: 0.05,
+            collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
-        // Connect parts with joints
-        // Head to torso
-        this.matter.add.joint(this.leftArm, this.torso, 0, 0.7, {
-            pointA: { x: 25, y: 0 },
-            pointB: { x: -20, y: -10 }
+        // Create limbs
+        this.character.parts.leftArm = this.matter.add.image(x - 40, torsoY, 'arm', null, {
+            label: 'leftArm',
+            density: 0.003,
+            frictionAir: 0.02,
+            collisionFilter: { group: 0, category: 2, mask: 255 }
         });
-        this.matter.add.joint(this.rightArm, this.torso, 0, 0.7, {
-            pointA: { x: -25, y: 0 },
-            pointB: { x: 20, y: -10 }
+
+        this.character.parts.rightArm = this.matter.add.image(x + 40, torsoY, 'arm', null, {
+            label: 'rightArm',
+            density: 0.003,
+            frictionAir: 0.02,
+            collisionFilter: { group: 0, category: 2, mask: 255 }
         });
+
+        this.character.parts.leftLeg = this.matter.add.image(x - 15, torsoY + 50, 'leg', null, {
+            label: 'leftLeg',
+            density: 0.005,
+            frictionAir: 0.02,
+            collisionFilter: { group: 0, category: 2, mask: 255 }
+        });
+
+        this.character.parts.rightLeg = this.matter.add.image(x + 15, torsoY + 50, 'leg', null, {
+            label: 'rightLeg',
+            density: 0.005,
+            frictionAir: 0.02,
+            collisionFilter: { group: 0, category: 2, mask: 255 }
+        });
+
+        // Create stronger joints
+        // Head to torso - stronger joint
+        this.matter.add.joint(
+            this.character.parts.head,
+            this.character.parts.torso,
+            10, // stiffness - higher value for more rigid joint
+            0.2  // damping - higher value to reduce oscillation
+        );
+
+        // Arms to torso
+        this.matter.add.joint(
+            this.character.parts.leftArm,
+            this.character.parts.torso,
+            5,
+            0.5,
+            {
+                pointA: { x: 25, y: 0 },
+                pointB: { x: -20, y: -15 }
+            }
+        );
+
+        this.matter.add.joint(
+            this.character.parts.rightArm,
+            this.character.parts.torso,
+            5,
+            0.5,
+            {
+                pointA: { x: -25, y: 0 },
+                pointB: { x: 20, y: -15 }
+            }
+        );
 
         // Legs to torso
-        this.matter.add.joint(this.leftLeg, this.torso, 0, 0.7, {
-            pointA: { x: 0, y: -25 },
-            pointB: { x: -15, y: 30 }
-        });
-        this.matter.add.joint(this.rightLeg, this.torso, 0, 0.7, {
-            pointA: { x: 0, y: -25 },
-            pointB: { x: 15, y: 30 }
-        });
+        this.matter.add.joint(
+            this.character.parts.leftLeg,
+            this.character.parts.torso,
+            5,
+            0.5,
+            {
+                pointA: { x: 0, y: -25 },
+                pointB: { x: -15, y: 30 }
+            }
+        );
 
-        // Group body parts for easier access
-        this.bodyParts = [this.torso, this.head, this.leftArm, this.rightArm, this.leftLeg, this.rightLeg];
+        this.matter.add.joint(
+            this.character.parts.rightLeg,
+            this.character.parts.torso,
+            5,
+            0.5,
+            {
+                pointA: { x: 0, y: -25 },
+                pointB: { x: 15, y: 30 }
+            }
+        );
+
+        // Set initial limb health
+        Object.keys(this.character.parts).forEach(part => {
+            if (part !== 'torso' && part !== 'head') {
+                this.character.parts[part].health = 3;
+            }
+        });
     }
 
-    // Set up key controls for limbs
     setupControls() {
-        this.leftArmKeys = {
-            up: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q),
-            down: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A)
-        };
-
-        this.rightArmKeys = {
-            up: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P),
-            down: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.L)
-        };
-
-        this.leftLegKeys = {
-            up: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
-            down: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S)
-        };
-
-        this.rightLegKeys = {
-            up: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.O),
-            down: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.K)
+        // Define control keys
+        this.controls = {
+            leftArm: {
+                up: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q),
+                down: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A)
+            },
+            rightArm: {
+                up: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P),
+                down: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.L)
+            },
+            leftLeg: {
+                up: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
+                down: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S)
+            },
+            rightLeg: {
+                up: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.O),
+                down: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.K)
+            }
         };
     }
 
-    // Update character balance
-    updateBalance() {
-        // Apply forces based on key presses
+    createEnemy(x, y) {
+        // Create enemy with "mouth" (a separate collision zone)
+        this.enemy = this.matter.add.image(x, y, 'enemy', null, {
+            label: 'enemy',
+            density: 0.005,
+            frictionAir: 0.05,
+            collisionFilter: { group: 0, category: 4, mask: 255 }
+        });
+
+        // Create invisible mouth part at the front of the enemy
+        const mouthSize = { width: 20, height: 10 };
+        this.enemyMouth = this.matter.add.rectangle(
+            x - 20, // Position at the "front" of the enemy
+            y,
+            mouthSize.width,
+            mouthSize.height,
+            {
+                label: 'enemyMouth',
+                isSensor: true, // Makes it not physically collide but still detect collisions
+                collisionFilter: { group: 0, category: 8, mask: 2 } // Only collide with character parts
+            }
+        );
+
+        // Connect mouth to enemy body
+        this.matter.add.joint(this.enemy, this.enemyMouth, 0, 1);
+
+        // Store enemy properties
+        this.enemy.speed = 0.0005;
+        this.enemy.mouth = this.enemyMouth;
+    }
+
+    handleCharacterControl() {
+        // Apply controlled forces to limbs
+        // Use a smaller force and add cooldown to prevent spinning
         const force = 0.01;
 
-        // Left arm control
-        if (this.leftArmKeys.up.isDown) {
-            this.leftArm.applyForce({ x: 0, y: -force });
-        }
-        if (this.leftArmKeys.down.isDown) {
-            this.leftArm.applyForce({ x: 0, y: force });
+        // Process each limb control
+        this.applyLimbControl('leftArm', force);
+        this.applyLimbControl('rightArm', force);
+        this.applyLimbControl('leftLeg', force);
+        this.applyLimbControl('rightLeg', force);
+    }
+
+    applyLimbControl(limbName, baseForce) {
+        const limb = this.character.parts[limbName];
+        const control = this.controls[limbName];
+
+        // Skip if limb is destroyed
+        if (!limb || !limb.active) return;
+
+        // Initialize cooldown property if not exists
+        if (typeof limb.cooldown === 'undefined') {
+            limb.cooldown = 0;
         }
 
-        // Right arm control
-        if (this.rightArmKeys.up.isDown) {
-            this.rightArm.applyForce({ x: 0, y: -force });
-        }
-        if (this.rightArmKeys.down.isDown) {
-            this.rightArm.applyForce({ x: 0, y: force });
+        // Reduce cooldown if active
+        if (limb.cooldown > 0) {
+            limb.cooldown--;
         }
 
-        // Left leg control
-        if (this.leftLegKeys.up.isDown) {
-            this.leftLeg.applyForce({ x: 0, y: -force });
-        }
-        if (this.leftLegKeys.down.isDown) {
-            this.leftLeg.applyForce({ x: 0, y: force });
-        }
+        // Apply forces if cooldown allows
+        if (limb.cooldown <= 0) {
+            let forceApplied = false;
 
-        // Right leg control
-        if (this.rightLegKeys.up.isDown) {
-            this.rightLeg.applyForce({ x: 0, y: -force });
-        }
-        if (this.rightLegKeys.down.isDown) {
-            this.rightLeg.applyForce({ x: 0, y: force });
-        }
+            if (control.up.isDown) {
+                limb.applyForce({ x: 0, y: -baseForce });
+                forceApplied = true;
+            }
+            else if (control.down.isDown) {
+                limb.applyForce({ x: 0, y: baseForce });
+                forceApplied = true;
+            }
 
-        // Basic balance check - only check if torso is clearly fallen over
-        // Increased threshold to avoid premature resets
-        if (this.torso.y > this.ground.y - 20) {
-            this.gameOver("Character fell on the ground!");
-        }
-        else if (Math.abs(this.torso.rotation) > 1.8) {
-            this.gameOver("Character fell over!");
+            // Set cooldown if force was applied
+            if (forceApplied) {
+                limb.cooldown = 5; // Adjust this value to control responsiveness
+            }
         }
     }
 
-    // Set up collision detection
     setupCollisions() {
-        // Check for collisions between limbs and enemies
+        // Set up collision detection
         this.matter.world.on('collisionstart', (event) => {
             if (!this.gameActive) return;
 
@@ -207,88 +355,168 @@ class GameScene extends Phaser.Scene {
                 const bodyA = pair.bodyA;
                 const bodyB = pair.bodyB;
 
-                // Check if collision is between arm and enemy
-                if ((bodyA.gameObject === this.leftArm || bodyA.gameObject === this.rightArm) &&
-                    bodyB.gameObject === this.enemy) {
-                    this.damageEnemy(this.enemy);
-                }
-                else if ((bodyB.gameObject === this.leftArm || bodyB.gameObject === this.rightArm) &&
-                    bodyA.gameObject === this.enemy) {
-                    this.damageEnemy(this.enemy);
+                // Check for torso touching ground (game over)
+                if (this.isCollisionBetween(pair, 'torso', 'ground')) {
+                    this.gameOver("Character fell down!");
+                    return;
                 }
 
-                // Check if player reached safehouse
-                if ((bodyA.gameObject === this.torso && bodyB.gameObject === this.safehouse) ||
-                    (bodyB.gameObject === this.torso && bodyA.gameObject === this.safehouse)) {
-                    console.log('Reached safehouse! You win!');
-                    this.add.text(400, 300, 'YOU WIN!', {
-                        fontSize: '48px',
-                        fill: '#fff',
-                        backgroundColor: '#000',
-                        padding: { x: 20, y: 10 }
-                    }).setOrigin(0.5);
+                // Check for reaching safehouse
+                if (this.isCollisionBetween(pair, 'torso', 'safehouse')) {
+                    this.winGame();
+                    return;
+                }
 
-                    // Restart the scene after a delay
-                    this.time.delayedCall(3000, () => {
-                        this.scene.start('MenuScene');
-                    });
+                // Check for enemy mouth contact with limbs (damage)
+                if (bodyA.label === 'enemyMouth' || bodyB.label === 'enemyMouth') {
+                    const otherBody = bodyA.label === 'enemyMouth' ? bodyB : bodyA;
+
+                    // Skip if not a limb
+                    if (!['leftArm', 'rightArm', 'leftLeg', 'rightLeg'].includes(otherBody.label)) {
+                        return;
+                    }
+
+                    // Find the limb game object
+                    const limb = otherBody.gameObject;
+                    if (limb && limb.active) {
+                        this.damageLimb(limb);
+                    }
+                }
+
+                // Check for limb pushing enemy
+                const isLimb = (body) => ['leftArm', 'rightArm', 'leftLeg', 'rightLeg'].includes(body.label);
+                const isEnemy = (body) => body.label === 'enemy';
+
+                if ((isLimb(bodyA) && isEnemy(bodyB)) || (isEnemy(bodyA) && isLimb(bodyB))) {
+                    const limb = isLimb(bodyA) ? bodyA.gameObject : bodyB.gameObject;
+                    const enemy = isEnemy(bodyA) ? bodyA.gameObject : bodyB.gameObject;
+
+                    // Calculate push force based on collision velocity
+                    const pushForce = 0.0002;
+                    const direction = isLimb(bodyA) ? 1 : -1; // Push away from limb
+
+                    // Apply push force to enemy
+                    enemy.applyForce({ x: direction * pushForce, y: 0 });
                 }
             });
         });
     }
 
-    // Enemy damage function
-    damageEnemy(enemy) {
-        // Simple enemy health system
-        if (!enemy.active || !this.gameActive) return;
-        enemy.health--;
+    isCollisionBetween(pair, labelA, labelB) {
+        return (pair.bodyA.label === labelA && pair.bodyB.label === labelB) ||
+            (pair.bodyA.label === labelB && pair.bodyB.label === labelA);
+    }
+
+    damageLimb(limb) {
+        // Skip if already damaged recently (cooldown)
+        if (limb.damageTime && this.time.now - limb.damageTime < 1000) {
+            return;
+        }
+
+        // Set damage time
+        limb.damageTime = this.time.now;
+
+        // Decrease health
+        limb.health--;
 
         // Visual feedback
         this.tweens.add({
-            targets: enemy,
+            targets: limb,
             alpha: 0.5,
             duration: 100,
-            yoyo: true
+            yoyo: true,
+            repeat: 2
         });
 
-        if (enemy.health <= 0) {
-            enemy.destroy();
+        // If health depleted, remove limb
+        if (limb.health <= 0) {
+            // Find the corresponding key in character.parts
+            const limbKey = Object.keys(this.character.parts).find(key => this.character.parts[key] === limb);
+
+            if (limbKey) {
+                // Remove the limb
+                limb.setActive(false).setVisible(false);
+                this.character.parts[limbKey] = null;
+
+                // Check if all limbs are gone
+                const hasLimbs = ['leftArm', 'rightArm', 'leftLeg', 'rightLeg'].some(
+                    part => this.character.parts[part] && this.character.parts[part].active
+                );
+
+                if (!hasLimbs) {
+                    this.gameOver("Lost all limbs!");
+                }
+            }
         }
     }
 
-    // Update enemy behavior
     updateEnemies() {
-        // Simple AI: move toward player
-        if (this.enemy && this.enemy.active) {
-            const dx = this.torso.x - this.enemy.x;
-            const speed = 0.001;
-            this.enemy.applyForce({ x: Math.sign(dx) * speed, y: 0 });
+        // Skip if enemy is inactive
+        if (!this.enemy || !this.enemy.active) return;
+
+        // Move enemy toward player
+        const dx = this.character.parts.torso.x - this.enemy.x;
+        const speed = this.enemy.speed;
+
+        // Apply horizontal force toward player
+        this.enemy.applyForce({ x: Math.sign(dx) * speed, y: 0 });
+
+        // Update mouth position to stay in front of enemy
+        if (this.enemyMouth) {
+            // Determine which side to place the mouth based on movement direction
+            const mouthOffset = dx > 0 ? 20 : -20;
+
+            // Update mouth position
+            this.matter.body.setPosition(this.enemyMouth, {
+                x: this.enemy.x + mouthOffset,
+                y: this.enemy.y
+            });
         }
     }
 
-    // Check game win/lose conditions
     checkGameState() {
-        // Win: Player reached safehouse (checked in collision detection)
+        // Game over if torso touches ground (checked in collision detection)
 
-        // Lose: Character fell over (checked in updateBalance)
+        // Game over if all limbs are destroyed (checked in damageLimb)
 
-        // Additional lose condition: Enemy reaches player and player doesn't defeat it
-        if (this.enemy && this.enemy.active) {
-            const distance = Phaser.Math.Distance.Between(this.torso.x, this.torso.y, this.enemy.x, this.enemy.y);
-            if (distance < 50) {
-                this.gameOver("Enemy caught you!");
+        // Check if enemy is very close to torso
+        if (this.enemy && this.enemy.active && this.character.parts.torso) {
+            const distance = Phaser.Math.Distance.Between(
+                this.character.parts.torso.x,
+                this.character.parts.torso.y,
+                this.enemy.x,
+                this.enemy.y
+            );
+
+            if (distance < 30) {
+                this.gameOver("Enemy got too close!");
             }
         }
     }
 
     updateDebugText() {
-        // Show position and rotation of torso
-        if (this.debugText && this.torso) {
-            this.debugText.setText(
-                `Torso: x=${Math.round(this.torso.x)}, y=${Math.round(this.torso.y)}, rotation=${this.torso.rotation.toFixed(2)}\n` +
-                `Enemy: ${this.enemy && this.enemy.active ? 'active' : 'defeated'}, health: ${this.enemy ? this.enemy.health : 0}`
-            );
-        }
+        if (!this.debugText || !this.character.parts.torso) return;
+
+        // Count active limbs
+        const activeLimbs = ['leftArm', 'rightArm', 'leftLeg', 'rightLeg'].filter(
+            part => this.character.parts[part] && this.character.parts[part].active
+        ).length;
+
+        // Update debug text
+        this.debugText.setText(
+            `Torso: x=${Math.round(this.character.parts.torso.x)}, ` +
+            `y=${Math.round(this.character.parts.torso.y)}, ` +
+            `rotation=${this.character.parts.torso.rotation.toFixed(2)}\n` +
+            `Limbs remaining: ${activeLimbs}/4\n` +
+            (this.enemy && this.enemy.active ?
+                `Enemy distance: ${Phaser.Math.Distance.Between(
+                    this.character.parts.torso.x,
+                    this.character.parts.torso.y,
+                    this.enemy.x,
+                    this.enemy.y
+                ).toFixed(0)}` :
+                'Enemy defeated')
+        );
     }
 
     gameOver(reason) {
@@ -297,10 +525,11 @@ class GameScene extends Phaser.Scene {
         this.gameActive = false;
         console.log('Game over:', reason);
 
+        // Add game over text
         this.add.text(400, 300, 'GAME OVER', {
             fontSize: '48px',
             fill: '#fff',
-            backgroundColor: '#000',
+            backgroundColor: '#880000',
             padding: { x: 20, y: 10 }
         }).setOrigin(0.5);
 
@@ -312,7 +541,7 @@ class GameScene extends Phaser.Scene {
             padding: { x: 10, y: 5 }
         }).setOrigin(0.5);
 
-        // Add restart instruction
+        // Add restart instructions
         this.add.text(400, 400, 'Press SPACE to try again', {
             fontSize: '20px',
             fill: '#fff',
@@ -332,6 +561,7 @@ class GameScene extends Phaser.Scene {
         this.gameActive = false;
         console.log('You win!');
 
+        // Add win text
         this.add.text(400, 300, 'YOU WIN!', {
             fontSize: '48px',
             fill: '#fff',
@@ -339,7 +569,7 @@ class GameScene extends Phaser.Scene {
             padding: { x: 20, y: 10 }
         }).setOrigin(0.5);
 
-        // Add restart instruction
+        // Add restart instructions
         this.add.text(400, 400, 'Press SPACE to play again', {
             fontSize: '20px',
             fill: '#fff',
@@ -352,5 +582,4 @@ class GameScene extends Phaser.Scene {
             this.scene.restart();
         });
     }
-
 }

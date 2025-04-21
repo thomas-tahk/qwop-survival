@@ -8,8 +8,11 @@ const config = {
     physics: {
         default: 'matter',
         matter: {
-            gravity: { y: .8 },
-            debug: true // Helpful during development
+            gravity: { y: 1 }, // Moderate gravity
+            debug: true, // Show physics bodies
+            debugBodyColor: 0xffffff, // White debug bodies
+            debugWireframes: true,
+            debugShowInternalEdges: true
         }
     },
     scene: [BootScene, MenuScene, GameScene]
