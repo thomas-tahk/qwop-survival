@@ -94,89 +94,172 @@ class GameScene extends Phaser.Scene {
     }
 
     createCharacterParts(x, torsoY) {
-        // Create torso as the main body
+        // Create torso
         this.character.parts.torso = this.matter.add.image(x, torsoY, 'torso', null, {
             label: 'torso',
             density: 0.01,
-            frictionAir: 0.05,
-            friction: 0.2,
+            frictionAir: 0.03, // Reduced air friction
+            friction: 0.3,     // Increased ground friction
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
-        // Create head at top of torso
+        // Create head
         this.character.parts.head = this.matter.add.image(x, torsoY - 50, 'head', null, {
             label: 'head',
             density: 0.005,
-            frictionAir: 0.05,
+            frictionAir: 0.03,
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
-        // Create arms
-        this.character.parts.leftArm = this.matter.add.image(x - 40, torsoY - 20, 'arm', null, {
-            label: 'leftArm',
+        // Create upper arms
+        this.character.parts.leftUpperArm = this.matter.add.image(x - 30, torsoY - 20, 'arm', null, {
+            label: 'leftUpperArm',
             density: 0.004,
-            frictionAir: 0.03,
+            frictionAir: 0.02,
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
-        this.character.parts.rightArm = this.matter.add.image(x + 40, torsoY - 20, 'arm', null, {
-            label: 'rightArm',
+        this.character.parts.rightUpperArm = this.matter.add.image(x + 30, torsoY - 20, 'arm', null, {
+            label: 'rightUpperArm',
             density: 0.004,
-            frictionAir: 0.03,
+            frictionAir: 0.02,
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
-        // Create legs
-        this.character.parts.leftLeg = this.matter.add.image(x - 15, torsoY + 50, 'leg', null, {
-            label: 'leftLeg',
-            density: 0.006,
-            frictionAir: 0.03,
+        // Create lower arms (forearms)
+        this.character.parts.leftLowerArm = this.matter.add.image(x - 60, torsoY - 20, 'arm', null, {
+            label: 'leftLowerArm',
+            density: 0.003,
+            frictionAir: 0.02,
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
-        this.character.parts.rightLeg = this.matter.add.image(x + 15, torsoY + 50, 'leg', null, {
-            label: 'rightLeg',
+        this.character.parts.rightLowerArm = this.matter.add.image(x + 60, torsoY - 20, 'arm', null, {
+            label: 'rightLowerArm',
+            density: 0.003,
+            frictionAir: 0.02,
+            collisionFilter: { group: 0, category: 2, mask: 255 }
+        });
+
+        // Create upper legs (thighs)
+        this.character.parts.leftUpperLeg = this.matter.add.image(x - 15, torsoY + 30, 'leg', null, {
+            label: 'leftUpperLeg',
+            density: 0.005,
+            frictionAir: 0.02,
+            collisionFilter: { group: 0, category: 2, mask: 255 }
+        });
+
+        this.character.parts.rightUpperLeg = this.matter.add.image(x + 15, torsoY + 30, 'leg', null, {
+            label: 'rightUpperLeg',
+            density: 0.005,
+            frictionAir: 0.02,
+            collisionFilter: { group: 0, category: 2, mask: 255 }
+        });
+
+        // Create lower legs (calves)
+        this.character.parts.leftLowerLeg = this.matter.add.image(x - 15, torsoY + 70, 'leg', null, {
+            label: 'leftLowerLeg',
             density: 0.006,
-            frictionAir: 0.03,
+            frictionAir: 0.02,
+            friction: 0.5, // Higher friction for feet to grip ground
+            collisionFilter: { group: 0, category: 2, mask: 255 }
+        });
+
+        this.character.parts.rightLowerLeg = this.matter.add.image(x + 15, torsoY + 70, 'leg', null, {
+            label: 'rightLowerLeg',
+            density: 0.006,
+            frictionAir: 0.02,
+            friction: 0.5, // Higher friction for feet to grip ground
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
     }
 
     createCharacterJoints() {
-        const torso = this.character.parts.torso;
-        const head = this.character.parts.head;
-        const leftArm = this.character.parts.leftArm;
-        const rightArm = this.character.parts.rightArm;
-        const leftLeg = this.character.parts.leftLeg;
-        const rightLeg = this.character.parts.rightLeg;
+        // Head to torso joint (same as before)
+        this.matter.add.joint(
+            this.character.parts.head,
+            this.character.parts.torso,
+            15, 0.4, {
+                pointA: { x: 0, y: 15 },
+                pointB: { x: 0, y: -40 }
+            }
+        );
 
-        // Head to torso - fix head at the TOP of torso
-        this.matter.add.joint(head, torso, 15, 0.4, {
-            pointA: { x: 0, y: 15 }, // Bottom of head
-            pointB: { x: 0, y: -40 }  // Top of torso
-        });
+        // Upper arm to torso joints (shoulders)
+        this.matter.add.joint(
+            this.character.parts.leftUpperArm,
+            this.character.parts.torso,
+            8, 0.4, {
+                pointA: { x: 25, y: 0 },
+                pointB: { x: -20, y: -30 }
+            }
+        );
 
-        // Arms to torso - position at shoulder height
-        this.matter.add.joint(leftArm, torso, 8, 0.4, {
-            pointA: { x: 25, y: 0 },
-            pointB: { x: -20, y: -30 } // Upper torso
-        });
+        this.matter.add.joint(
+            this.character.parts.rightUpperArm,
+            this.character.parts.torso,
+            8, 0.4, {
+                pointA: { x: -25, y: 0 },
+                pointB: { x: 20, y: -30 }
+            }
+        );
 
-        this.matter.add.joint(rightArm, torso, 8, 0.4, {
-            pointA: { x: -25, y: 0 },
-            pointB: { x: 20, y: -30 } // Upper torso
-        });
+        // Lower arm to upper arm joints (elbows)
+        this.matter.add.joint(
+            this.character.parts.leftLowerArm,
+            this.character.parts.leftUpperArm,
+            8, 0.4, {
+                pointA: { x: 25, y: 0 },
+                pointB: { x: -25, y: 0 }
+            }
+        );
 
-        // Legs to torso - position at hip height
-        this.matter.add.joint(leftLeg, torso, 8, 0.4, {
-            pointA: { x: 0, y: -25 },
-            pointB: { x: -15, y: 30 } // Lower torso
-        });
+        this.matter.add.joint(
+            this.character.parts.rightLowerArm,
+            this.character.parts.rightUpperArm,
+            8, 0.4, {
+                pointA: { x: -25, y: 0 },
+                pointB: { x: 25, y: 0 }
+            }
+        );
 
-        this.matter.add.joint(rightLeg, torso, 8, 0.4, {
-            pointA: { x: 0, y: -25 },
-            pointB: { x: 15, y: 30 } // Lower torso
-        });
+        // Upper leg to torso joints (hips)
+        this.matter.add.joint(
+            this.character.parts.leftUpperLeg,
+            this.character.parts.torso,
+            8, 0.4, {
+                pointA: { x: 0, y: -25 },
+                pointB: { x: -15, y: 30 }
+            }
+        );
+
+        this.matter.add.joint(
+            this.character.parts.rightUpperLeg,
+            this.character.parts.torso,
+            8, 0.4, {
+                pointA: { x: 0, y: -25 },
+                pointB: { x: 15, y: 30 }
+            }
+        );
+
+        // Lower leg to upper leg joints (knees)
+        this.matter.add.joint(
+            this.character.parts.leftLowerLeg,
+            this.character.parts.leftUpperLeg,
+            8, 0.4, {
+                pointA: { x: 0, y: -25 },
+                pointB: { x: 0, y: 25 }
+            }
+        );
+
+        this.matter.add.joint(
+            this.character.parts.rightLowerLeg,
+            this.character.parts.rightUpperLeg,
+            8, 0.4, {
+                pointA: { x: 0, y: -25 },
+                pointB: { x: 0, y: 25 }
+            }
+        );
     }
 
     initLimbHealth() {
@@ -193,67 +276,92 @@ class GameScene extends Phaser.Scene {
         this.controls = {
             leftArm: {
                 up: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q),
-                down: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A)
+                down: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
+                left: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Z), // New!
+                right: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X)  // New!
             },
             rightArm: {
                 up: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P),
-                down: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.L)
+                down: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.L),
+                left: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.N), // New!
+                right: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.M)  // New!
             },
             leftLeg: {
                 up: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
-                down: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S)
+                down: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
+                left: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E), // New!
+                right: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R)  // New!
             },
             rightLeg: {
                 up: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.O),
-                down: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.K)
+                down: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.K),
+                left: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.I), // New!
+                right: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.U)  // New!
             }
         };
     }
 
     handleCharacterControl() {
         // Apply controlled forces to limbs
-        const force = 0.03;
+        const force = 0.05;
 
-        // Process each limb control
-        this.applyLimbControl('leftArm', force);
-        this.applyLimbControl('rightArm', force);
-        this.applyLimbControl('leftLeg', force);
-        this.applyLimbControl('rightLeg', force);
+        // Apply forces to limbs with both vertical and horizontal controls
+        this.applyLimbControl('leftUpperArm', 'leftLowerArm', force);
+        this.applyLimbControl('rightUpperArm', 'rightLowerArm', force);
+        this.applyLimbControl('leftUpperLeg', 'leftLowerLeg', force);
+        this.applyLimbControl('rightUpperLeg', 'rightLowerLeg', force);
     }
 
-    applyLimbControl(limbName, baseForce) {
-        const limb = this.character.parts[limbName];
-        const control = this.controls[limbName];
+    applyLimbControl(upperLimbName, lowerLimbName, baseForce) {
+        // Extract the limb type from the name (leftArm, rightArm, leftLeg, rightLeg)
+        const limbType = upperLimbName.includes('Arm') ?
+            upperLimbName.replace('Upper', '') :
+            upperLimbName.replace('Upper', '');
 
-        // Skip if limb is destroyed
-        if (!limb || !limb.active) return;
+        const upperLimb = this.character.parts[upperLimbName];
+        const lowerLimb = this.character.parts[lowerLimbName];
+        const control = this.controls[limbType];
+
+        // Skip if limbs are destroyed
+        if (!upperLimb || !upperLimb.active || !lowerLimb || !lowerLimb.active) return;
 
         // Initialize cooldown property if not exists
-        if (typeof limb.cooldown === 'undefined') {
-            limb.cooldown = 0;
+        if (typeof upperLimb.cooldown === 'undefined') {
+            upperLimb.cooldown = 0;
         }
 
-        // Reduce cooldown if active
-        if (limb.cooldown > 0) {
-            limb.cooldown--;
+        // Reduce cooldown
+        if (upperLimb.cooldown > 0) {
+            upperLimb.cooldown--;
         }
 
         // Apply forces if cooldown allows
-        if (limb.cooldown <= 0) {
+        if (upperLimb.cooldown <= 0) {
             let forceApplied = false;
 
+            // Apply vertical forces to upper limb
             if (control.up.isDown) {
-                limb.applyForce({ x: 0, y: -baseForce });
+                upperLimb.applyForce({ x: 0, y: -baseForce });
                 forceApplied = true;
             }
             else if (control.down.isDown) {
-                limb.applyForce({ x: 0, y: baseForce });
+                upperLimb.applyForce({ x: 0, y: baseForce });
+                forceApplied = true;
+            }
+
+            // Apply horizontal forces to lower limb for movement
+            if (control.left.isDown) {
+                lowerLimb.applyForce({ x: -baseForce, y: 0 });
+                forceApplied = true;
+            }
+            else if (control.right.isDown) {
+                lowerLimb.applyForce({ x: baseForce, y: 0 });
                 forceApplied = true;
             }
 
             // Set cooldown if force was applied
             if (forceApplied) {
-                limb.cooldown = 2; // Lower cooldown for more responsive controls
+                upperLimb.cooldown = 1; // Reduced for more responsive controls
             }
         }
     }
@@ -348,17 +456,14 @@ class GameScene extends Phaser.Scene {
 
         // Move enemy toward player
         const dx = this.character.parts.torso.x - this.enemy.x;
-        const speed = this.enemy.speed;
+        const speed = 0.002; // Increased from 0.0005 to be more noticeable
 
         // Apply horizontal force toward player
         this.enemy.applyForce({ x: Math.sign(dx) * speed, y: 0 });
 
-        // Update mouth position to stay in front of enemy
+        // Update mouth position
         if (this.enemyMouth) {
-            // Determine which side to place the mouth based on movement direction
             const mouthOffset = dx > 0 ? 20 : -20;
-
-            // Update mouth position
             this.matter.body.setPosition(this.enemyMouth, {
                 x: this.enemy.x + mouthOffset,
                 y: this.enemy.y
@@ -382,6 +487,9 @@ class GameScene extends Phaser.Scene {
     //-------------------------------------------------------------------------
 
     setupCollisions() {
+        // Initialize torso ground contact tracker
+        this.torsoGroundContact = null;
+
         // Set up collision detection
         this.matter.world.on('collisionstart', (event) => {
             if (!this.gameActive) return;
@@ -390,9 +498,14 @@ class GameScene extends Phaser.Scene {
                 const bodyA = pair.bodyA;
                 const bodyB = pair.bodyB;
 
-                // Check for torso touching ground (game over)
+                // Check for torso touching ground (game over with delay)
                 if (this.isCollisionBetween(pair, 'torso', 'ground')) {
-                    this.gameOver("Character fell down!");
+                    if (!this.torsoGroundContact) {
+                        this.torsoGroundContact = {
+                            time: this.time.now,
+                            velocity: this.character.parts.torso.body.velocity.y
+                        };
+                    }
                     return;
                 }
 
@@ -406,20 +519,18 @@ class GameScene extends Phaser.Scene {
                 if (bodyA.label === 'enemyMouth' || bodyB.label === 'enemyMouth') {
                     const otherBody = bodyA.label === 'enemyMouth' ? bodyB : bodyA;
 
-                    // Skip if not a limb
-                    if (!['leftArm', 'rightArm', 'leftLeg', 'rightLeg'].includes(otherBody.label)) {
-                        return;
-                    }
-
-                    // Find the limb game object
-                    const limb = otherBody.gameObject;
-                    if (limb && limb.active) {
-                        this.damageLimb(limb);
+                    // Check if it's any limb part (upper or lower)
+                    if (otherBody.label && otherBody.label.includes('Arm') || otherBody.label.includes('Leg')) {
+                        // Find the limb game object
+                        const limb = otherBody.gameObject;
+                        if (limb && limb.active) {
+                            this.damageLimb(limb);
+                        }
                     }
                 }
 
-                // Check for limb pushing enemy
-                const isLimb = (body) => ['leftArm', 'rightArm', 'leftLeg', 'rightLeg'].includes(body.label);
+                // Check for limb pushing enemy - updated for multi-jointed limbs
+                const isLimb = (body) => body.label && (body.label.includes('Arm') || body.label.includes('Leg'));
                 const isEnemy = (body) => body.label === 'enemy';
 
                 if ((isLimb(bodyA) && isEnemy(bodyB)) || (isEnemy(bodyA) && isLimb(bodyB))) {
@@ -432,6 +543,15 @@ class GameScene extends Phaser.Scene {
 
                     // Apply push force to enemy
                     enemy.applyForce({ x: direction * pushForce, y: 0 });
+                }
+            });
+        });
+
+        // Add collision end detection to reset torso ground contact
+        this.matter.world.on('collisionend', (event) => {
+            event.pairs.forEach((pair) => {
+                if (this.isCollisionBetween(pair, 'torso', 'ground')) {
+                    this.torsoGroundContact = null;
                 }
             });
         });
@@ -499,9 +619,17 @@ class GameScene extends Phaser.Scene {
     }
 
     checkGameState() {
-        // Game over if torso touches ground (checked in collision detection)
+        // Check for torso on ground for too long
+        if (this.torsoGroundContact && this.time.now - this.torsoGroundContact.time > 500) {
+            this.gameOver("Character fell down!");
+            return;
+        }
 
-        // Game over if all limbs are destroyed (checked in damageLimb)
+        // Check for tilt (if torso is too rotated)
+        if (this.character.parts.torso && Math.abs(this.character.parts.torso.rotation) > 1.8) {
+            this.gameOver("Character fell over!");
+            return;
+        }
 
         // Check if enemy is very close to torso
         if (this.enemy && this.enemy.active && this.character.parts.torso) {
@@ -593,13 +721,13 @@ class GameScene extends Phaser.Scene {
     //-------------------------------------------------------------------------
 
     setupGameUI() {
-        // Add instructions text
+        // Add instructions text for regular controls
         this.add.text(400, 30, 'ESC to pause, R to reset', {
             fontSize: '16px',
             fill: '#fff'
         }).setOrigin(0.5);
 
-        this.add.text(400, 70, 'Use Q/A for left arm, P/L for right arm\nW/S for left leg, O/K for right leg', {
+        this.add.text(400, 70, 'QWOP keys for UP/DOWN control\nNew: Use ZXER/NMIU for LEFT/RIGHT control', {
             fontSize: '16px',
             fill: '#fff',
             align: 'center'
@@ -633,15 +761,18 @@ class GameScene extends Phaser.Scene {
             label.setOrigin(0.5);
             label.setDepth(10);
 
-            // Store reference to update position
             limb.controlLabel = label;
         };
 
-        // Create labels for each limb
-        createLabel(this.character.parts.leftArm, "Q/A");
-        createLabel(this.character.parts.rightArm, "P/L");
-        createLabel(this.character.parts.leftLeg, "W/S");
-        createLabel(this.character.parts.rightLeg, "O/K");
+        // Create labels for limbs
+        createLabel(this.character.parts.leftUpperArm, "Q/A");
+        createLabel(this.character.parts.leftLowerArm, "Z/X");
+        createLabel(this.character.parts.rightUpperArm, "P/L");
+        createLabel(this.character.parts.rightLowerArm, "N/M");
+        createLabel(this.character.parts.leftUpperLeg, "W/S");
+        createLabel(this.character.parts.leftLowerLeg, "E/R");
+        createLabel(this.character.parts.rightUpperLeg, "O/K");
+        createLabel(this.character.parts.rightLowerLeg, "I/U");
     }
 
     updateLimbLabels() {
@@ -656,17 +787,20 @@ class GameScene extends Phaser.Scene {
     updateDebugText() {
         if (!this.debugText || !this.character.parts.torso) return;
 
-        // Count active limbs
-        const activeLimbs = ['leftArm', 'rightArm', 'leftLeg', 'rightLeg'].filter(
-            part => this.character.parts[part] && this.character.parts[part].active
-        ).length;
+        // Count active limbs (upper and lower segments)
+        const activeLimbParts = [
+            'leftUpperArm', 'leftLowerArm', 'rightUpperArm', 'rightLowerArm',
+            'leftUpperLeg', 'leftLowerLeg', 'rightUpperLeg', 'rightLowerLeg'
+        ].filter(part => this.character.parts[part] && this.character.parts[part].active).length;
+
+        const totalLimbParts = 8; // 4 limbs * 2 segments each
 
         // Update debug text
         this.debugText.setText(
             `Torso: x=${Math.round(this.character.parts.torso.x)}, ` +
             `y=${Math.round(this.character.parts.torso.y)}, ` +
             `rotation=${this.character.parts.torso.rotation.toFixed(2)}\n` +
-            `Limbs remaining: ${activeLimbs}/4\n` +
+            `Limb parts: ${activeLimbParts}/${totalLimbParts}\n` +
             (this.enemy && this.enemy.active ?
                 `Enemy distance: ${Phaser.Math.Distance.Between(
                     this.character.parts.torso.x,
