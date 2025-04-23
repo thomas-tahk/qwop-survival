@@ -272,44 +272,73 @@ class GameScene extends Phaser.Scene {
     }
 
     setupControls() {
-        // Define control keys
-        this.controls = {
-            leftArm: {
-                up: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q),
-                down: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
-                left: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Z), // New!
-                right: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X)  // New!
-            },
-            rightArm: {
-                up: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P),
-                down: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.L),
-                left: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.N), // New!
-                right: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.M)  // New!
-            },
-            leftLeg: {
-                up: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
-                down: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
-                left: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E), // New!
-                right: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R)  // New!
-            },
-            rightLeg: {
-                up: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.O),
-                down: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.K),
-                left: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.I), // New!
-                right: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.U)  // New!
-            }
+        // Define QWOP-style control keys
+        this.keys = {
+            // Thigh controls
+            q: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q),
+            w: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
+
+            // Calf controls
+            o: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.O),
+            p: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P),
+
+            // Arm control (both arms)
+            space: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
+
+            // Game controls
+            esc: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC),
+            r: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R),
+
+            // Restart after game over
+            restart: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE)
         };
+
+        // Set up key events
+        this.keys.esc.on('down', () => {
+            this.togglePause();
+        });
+
+        this.keys.r.on('down', () => {
+            this.resetGame();
+        });
     }
 
     handleCharacterControl() {
-        // Apply controlled forces to limbs
+        if (!this.gameActive || this.isPaused) return;
+
         const force = 0.05;
 
-        // Apply forces to limbs with both vertical and horizontal controls
-        this.applyLimbControl('leftUpperArm', 'leftLowerArm', force);
-        this.applyLimbControl('rightUpperArm', 'rightLowerArm', force);
-        this.applyLimbControl('leftUpperLeg', 'leftLowerLeg', force);
-        this.applyLimbControl('rightUpperLeg', 'rightLowerLeg', force);
+        // Thigh controls (Q and W)
+        if (this.keys.q.isDown) {
+            // Q: Right thigh forward, left thigh backward
+            this.character.parts.rightUpperLeg.applyForce({ x: force, y: 0 });
+            this.character.parts.leftUpperLeg.applyForce({ x: -force, y: 0 });
+        }
+
+        if (this.keys.w.isDown) {
+            // W: Left thigh forward, right thigh backward
+            this.character.parts.leftUpperLeg.applyForce({ x: force, y: 0 });
+            this.character.parts.rightUpperLeg.applyForce({ x: -force, y: 0 });
+        }
+
+        // Calf controls (O and P)
+        if (this.keys.o.isDown) {
+            // O: Right calf forward, left calf backward
+            this.character.parts.rightLowerLeg.applyForce({ x: force, y: 0 });
+            this.character.parts.leftLowerLeg.applyForce({ x: -force, y: 0 });
+        }
+
+        if (this.keys.p.isDown) {
+            // P: Left calf forward, right calf backward
+            this.character.parts.leftLowerLeg.applyForce({ x: force, y: 0 });
+            this.character.parts.rightLowerLeg.applyForce({ x: -force, y: 0 });
+        }
+
+        // Arm control (SPACE) - swing both arms forward
+        if (this.keys.space.isDown) {
+            this.character.parts.leftUpperArm.applyForce({ x: force, y: -force/2 });
+            this.character.parts.rightUpperArm.applyForce({ x: force, y: -force/2 });
+        }
     }
 
     applyLimbControl(upperLimbName, lowerLimbName, baseForce) {
@@ -420,7 +449,7 @@ class GameScene extends Phaser.Scene {
     //-------------------------------------------------------------------------
 
     createEnemy(x, y) {
-        // Create enemy with "mouth" (a separate collision zone)
+        // Create enemy with more noticeable appearance
         this.enemy = this.matter.add.image(x, y, 'enemy', null, {
             label: 'enemy',
             density: 0.005,
@@ -428,17 +457,20 @@ class GameScene extends Phaser.Scene {
             collisionFilter: { group: 0, category: 4, mask: 255 }
         });
 
+        // Make enemy slightly larger
+        this.enemy.setScale(1.2);
+
         // Create invisible mouth part at the front of the enemy
         const mouthSize = { width: 20, height: 10 };
         this.enemyMouth = this.matter.add.rectangle(
-            x - 20, // Position at the "front" of the enemy
+            x - 20,
             y,
             mouthSize.width,
             mouthSize.height,
             {
                 label: 'enemyMouth',
-                isSensor: true, // Makes it not physically collide but still detect collisions
-                collisionFilter: { group: 0, category: 8, mask: 2 } // Only collide with character parts
+                isSensor: true,
+                collisionFilter: { group: 0, category: 8, mask: 2 }
             }
         );
 
@@ -446,8 +478,17 @@ class GameScene extends Phaser.Scene {
         this.matter.add.joint(this.enemy, this.enemyMouth, 0, 1);
 
         // Store enemy properties
-        this.enemy.speed = 0.0005;
+        this.enemy.speed = 0.001; // Faster speed to make it more threatening
         this.enemy.mouth = this.enemyMouth;
+
+        // Add pulsing effect to make enemy more noticeable
+        this.tweens.add({
+            targets: this.enemy,
+            alpha: 0.8,
+            duration: 500,
+            yoyo: true,
+            repeat: -1
+        });
     }
 
     updateEnemies() {
@@ -498,7 +539,7 @@ class GameScene extends Phaser.Scene {
                 const bodyA = pair.bodyA;
                 const bodyB = pair.bodyB;
 
-                // Check for torso touching ground (game over with delay)
+                // Check for torso touching ground
                 if (this.isCollisionBetween(pair, 'torso', 'ground')) {
                     if (!this.torsoGroundContact) {
                         this.torsoGroundContact = {
@@ -515,34 +556,25 @@ class GameScene extends Phaser.Scene {
                     return;
                 }
 
-                // Check for enemy mouth contact with limbs (damage)
-                if (bodyA.label === 'enemyMouth' || bodyB.label === 'enemyMouth') {
-                    const otherBody = bodyA.label === 'enemyMouth' ? bodyB : bodyA;
-
-                    // Check if it's any limb part (upper or lower)
-                    if (otherBody.label && otherBody.label.includes('Arm') || otherBody.label.includes('Leg')) {
-                        // Find the limb game object
-                        const limb = otherBody.gameObject;
-                        if (limb && limb.active) {
-                            this.damageLimb(limb);
-                        }
-                    }
-                }
-
-                // Check for limb pushing enemy - updated for multi-jointed limbs
-                const isLimb = (body) => body.label && (body.label.includes('Arm') || body.label.includes('Leg'));
+                // Check for arm collisions with enemy - more effective pushback
+                const isArm = (body) => body.label && body.label.includes('Arm');
                 const isEnemy = (body) => body.label === 'enemy';
 
-                if ((isLimb(bodyA) && isEnemy(bodyB)) || (isEnemy(bodyA) && isLimb(bodyB))) {
-                    const limb = isLimb(bodyA) ? bodyA.gameObject : bodyB.gameObject;
+                if ((isArm(bodyA) && isEnemy(bodyB)) || (isEnemy(bodyA) && isArm(bodyB))) {
                     const enemy = isEnemy(bodyA) ? bodyA.gameObject : bodyB.gameObject;
 
-                    // Calculate push force based on collision velocity
-                    const pushForce = 0.0002;
-                    const direction = isLimb(bodyA) ? 1 : -1; // Push away from limb
+                    // Strong pushback when hitting enemy with arms
+                    const pushForce = 0.001; // Increased force for more noticeable effect
+                    const direction = isArm(bodyA) ? 1 : -1;
 
-                    // Apply push force to enemy
-                    enemy.applyForce({ x: direction * pushForce, y: 0 });
+                    // Apply stronger push force to enemy
+                    enemy.applyForce({ x: direction * pushForce, y: -pushForce/2 });
+
+                    // Visual feedback
+                    this.cameras.main.shake(100, 0.01);
+
+                    // Play feedback sound if you want to add sound later
+                    console.log("Enemy hit!");
                 }
             });
         });
@@ -623,6 +655,17 @@ class GameScene extends Phaser.Scene {
         if (this.torsoGroundContact && this.time.now - this.torsoGroundContact.time > 500) {
             this.gameOver("Character fell down!");
             return;
+        }
+
+        // Check for out of bounds
+        if (this.character.parts.torso) {
+            const torsoX = this.character.parts.torso.x;
+            const torsoY = this.character.parts.torso.y;
+
+            if (torsoX < 0 || torsoX > 800 || torsoY < 0 || torsoY > 600) {
+                this.gameOver("Out of bounds!");
+                return;
+            }
         }
 
         // Check for tilt (if torso is too rotated)
@@ -721,13 +764,13 @@ class GameScene extends Phaser.Scene {
     //-------------------------------------------------------------------------
 
     setupGameUI() {
-        // Add instructions text for regular controls
+        // Add instructions text for QWOP controls
         this.add.text(400, 30, 'ESC to pause, R to reset', {
             fontSize: '16px',
             fill: '#fff'
         }).setOrigin(0.5);
 
-        this.add.text(400, 70, 'QWOP keys for UP/DOWN control\nNew: Use ZXER/NMIU for LEFT/RIGHT control', {
+        this.add.text(400, 70, 'Classic QWOP controls:\nQ/W: Thighs, O/P: Calves\nSPACE: Swing arms to defend', {
             fontSize: '16px',
             fill: '#fff',
             align: 'center'
@@ -741,12 +784,12 @@ class GameScene extends Phaser.Scene {
             padding: { x: 5, y: 5 }
         });
 
-        // Create limb control labels
+        // Create simpler limb labels
         this.createLimbLabels();
     }
 
+    // Simpler limb labels
     createLimbLabels() {
-        // Create label for each limb
         const createLabel = (limb, text) => {
             if (!limb || !limb.active) return;
 
@@ -764,15 +807,11 @@ class GameScene extends Phaser.Scene {
             limb.controlLabel = label;
         };
 
-        // Create labels for limbs
-        createLabel(this.character.parts.leftUpperArm, "Q/A");
-        createLabel(this.character.parts.leftLowerArm, "Z/X");
-        createLabel(this.character.parts.rightUpperArm, "P/L");
-        createLabel(this.character.parts.rightLowerArm, "N/M");
-        createLabel(this.character.parts.leftUpperLeg, "W/S");
-        createLabel(this.character.parts.leftLowerLeg, "E/R");
-        createLabel(this.character.parts.rightUpperLeg, "O/K");
-        createLabel(this.character.parts.rightLowerLeg, "I/U");
+        // Just label the main control points
+        createLabel(this.character.parts.leftUpperLeg, "W");
+        createLabel(this.character.parts.rightUpperLeg, "Q");
+        createLabel(this.character.parts.leftLowerLeg, "P");
+        createLabel(this.character.parts.rightLowerLeg, "O");
     }
 
     updateLimbLabels() {
