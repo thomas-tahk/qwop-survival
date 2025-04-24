@@ -383,28 +383,47 @@ class GameScene extends Phaser.Scene {
                 : this.character.parts.rightLowerArm;
 
             if (upperArm && upperArm.active && lowerArm && lowerArm.active) {
-                // Stronger jab force
-                const jabForce = 0.35; // Increased slightly
-
-                // Apply jab forces - more direct punching action
-                upperArm.setVelocity(0, 0); // Clear existing velocity first
+                // Clear existing velocities for a cleaner punch
+                upperArm.setVelocity(0, 0);
                 lowerArm.setVelocity(0, 0);
 
-                // Apply stronger, more directed punch force
-                upperArm.applyForce({ x: jabForce * 0.3, y: -0.08 }); // Reduced forward momentum
-                lowerArm.applyForce({ x: jabForce * 0.5, y: -0.1 });  // Reduced forward momentum
+                // Very little forward movement but strong impact
+                const punchDirection = 0.1; // Minimal forward movement
+                const punchPower = 0.6;    // Strong sideways/impact force
 
-                // Visual feedback for punch
+                if (this.useLeftArm) {
+                    // Punch direction slightly outward for left arm
+                    upperArm.applyForce({x: punchDirection, y: -0.2});
+                    lowerArm.applyForce({x: punchDirection * 0.5, y: -0.3});
+
+                    // Sideways force component for impact
+                    if (this.enemy && this.character.parts.torso.x < this.enemy.x) {
+                        upperArm.applyForce({x: punchPower, y: 0});
+                        lowerArm.applyForce({x: punchPower * 1.5, y: 0});
+                    }
+                } else {
+                    // Punch direction slightly outward for right arm
+                    upperArm.applyForce({x: punchDirection, y: -0.2});
+                    lowerArm.applyForce({x: punchDirection * 0.5, y: -0.3});
+
+                    // Sideways force component for impact
+                    if (this.enemy && this.character.parts.torso.x < this.enemy.x) {
+                        upperArm.applyForce({x: punchPower, y: 0});
+                        lowerArm.applyForce({x: punchPower * 1.5, y: 0});
+                    }
+                }
+
+                // Visual feedback
                 this.tweens.add({
                     targets: lowerArm,
-                    alpha: 0.7,
-                    duration: 50,
+                    alpha: 0.5,
+                    duration: 100,
                     yoyo: true,
                     repeat: 1
                 });
 
-                // Small camera shake for impact
-                this.cameras.main.shake(100, 0.005);
+                // More noticeable camera shake for impact
+                this.cameras.main.shake(150, 0.01);
             }
         }
     }
@@ -590,7 +609,7 @@ class GameScene extends Phaser.Scene {
         });
 
         // Scale enemy
-        this.enemy.setScale(1.8);
+        this.enemy.setScale(1.4, 2.2);
         this.enemy.setFriction(0.05); // Add surface friction
         this.enemy.setFrictionAir(0.1); // Increase air friction to prevent sliding
         this.enemy.setBounce(0); // Prevent bouncing entirely
@@ -600,14 +619,14 @@ class GameScene extends Phaser.Scene {
         }
 
         // Create enemy limbs that can interact with player
-        this.enemyLeftArm = this.matter.add.image(x - 40, y, 'enemyArm', null, {
+        this.enemyLeftArm = this.matter.add.image(x - 30, y - 10, 'enemyArm', null, {
             label: 'enemyArm',
             density: 0.003,
             frictionAir: 0.01,
             collisionFilter: { group: 0, category: 8, mask: 255 }
         });
 
-        this.enemyRightArm = this.matter.add.image(x + 40, y, 'enemyArm', null, {
+        this.enemyRightArm = this.matter.add.image(x + 30, y - 10, 'enemyArm', null, {
             label: 'enemyArm',
             density: 0.003,
             frictionAir: 0.01,
