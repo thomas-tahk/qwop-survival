@@ -35,16 +35,20 @@ class GameScene extends Phaser.Scene {
         this.setupGameUI();
     }
 
+    // Add distance tracking in update
     update() {
         if (!this.gameActive || this.isPaused) return;
 
         // Update gameplay elements
         this.handleCharacterControl();
         this.updateEnemies();
-
-        // Update UI
-        this.updateDebugText();
         this.updateLimbLabels();
+
+        // Update distance marker
+        if (this.character && this.character.parts.torso) {
+            const distance = Math.max(0, Math.floor(this.character.parts.torso.x / 10));
+            this.distanceText.setText(`Distance: ${distance}m`);
+        }
 
         // Check for game state changes
         this.checkGameState();
@@ -55,17 +59,29 @@ class GameScene extends Phaser.Scene {
     //-------------------------------------------------------------------------
 
     setupWorld() {
-        // Create ground
-        this.ground = this.matter.add.image(400, 580, 'ground', null, {
+        // Create a wider ground for scrolling
+        this.ground = this.matter.add.image(800, 580, 'ground', null, {
             isStatic: true,
             label: 'ground',
             friction: 0.5,
-            collisionFilter: { group: 0, category: 1, mask: 255 }
         });
-        this.ground.setScale(1, 1);
+        this.ground.setScale(3, 1); // 3x wider for scrolling
 
         // Store ground top position for reference
         this.groundTop = this.ground.y - this.ground.height / 2;
+
+        // Setup camera
+        this.cameras.main.setBounds(0, 0, 800 * 2, 600); // 2 screen widths
+
+        // Set world bounds
+        this.matter.world.setBounds(0, 0, 800 * 2, 600);
+
+        // Create finish line at the end
+        this.finishLine = this.matter.add.image(800 * 2 - 100, this.groundTop - 60, 'finishLine', null, {
+            isStatic: true,
+            label: 'finishLine',
+            isSensor: true
+        });
     }
 
     //-------------------------------------------------------------------------
@@ -94,12 +110,12 @@ class GameScene extends Phaser.Scene {
     }
 
     createCharacterParts(x, torsoY) {
-        // Create torso
+        // Create torso with better stability
         this.character.parts.torso = this.matter.add.image(x, torsoY, 'torso', null, {
             label: 'torso',
-            density: 0.01,
-            frictionAir: 0.03, // Reduced air friction
-            friction: 0.3,     // Increased ground friction
+            density: 0.012,  // Slightly heavier for stability
+            frictionAir: 0.02, // Less air friction for better movement
+            friction: 0.2,
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
@@ -107,69 +123,69 @@ class GameScene extends Phaser.Scene {
         this.character.parts.head = this.matter.add.image(x, torsoY - 50, 'head', null, {
             label: 'head',
             density: 0.005,
-            frictionAir: 0.03,
+            frictionAir: 0.02,
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
         // Create upper arms
         this.character.parts.leftUpperArm = this.matter.add.image(x - 30, torsoY - 20, 'arm', null, {
             label: 'leftUpperArm',
-            density: 0.004,
-            frictionAir: 0.02,
+            density: 0.003,  // Lighter arms
+            frictionAir: 0.03, // More air friction to limit momentum
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
         this.character.parts.rightUpperArm = this.matter.add.image(x + 30, torsoY - 20, 'arm', null, {
             label: 'rightUpperArm',
-            density: 0.004,
-            frictionAir: 0.02,
+            density: 0.003,  // Lighter arms
+            frictionAir: 0.03, // More air friction to limit momentum
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
         // Create lower arms (forearms)
         this.character.parts.leftLowerArm = this.matter.add.image(x - 60, torsoY - 20, 'arm', null, {
             label: 'leftLowerArm',
-            density: 0.003,
-            frictionAir: 0.02,
+            density: 0.002,
+            frictionAir: 0.03,
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
         this.character.parts.rightLowerArm = this.matter.add.image(x + 60, torsoY - 20, 'arm', null, {
             label: 'rightLowerArm',
-            density: 0.003,
-            frictionAir: 0.02,
+            density: 0.002,
+            frictionAir: 0.03,
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
-        // Create upper legs (thighs)
+        // Create upper legs (thighs) - heavier for better ground contact
         this.character.parts.leftUpperLeg = this.matter.add.image(x - 15, torsoY + 30, 'leg', null, {
             label: 'leftUpperLeg',
-            density: 0.005,
-            frictionAir: 0.02,
+            density: 0.007,  // Heavier legs
+            frictionAir: 0.01,  // Less air friction
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
         this.character.parts.rightUpperLeg = this.matter.add.image(x + 15, torsoY + 30, 'leg', null, {
             label: 'rightUpperLeg',
-            density: 0.005,
-            frictionAir: 0.02,
+            density: 0.007,  // Heavier legs
+            frictionAir: 0.01,  // Less air friction
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
-        // Create lower legs (calves)
+        // Create lower legs (calves) with high friction for gripping
         this.character.parts.leftLowerLeg = this.matter.add.image(x - 15, torsoY + 70, 'leg', null, {
             label: 'leftLowerLeg',
-            density: 0.006,
-            frictionAir: 0.02,
-            friction: 0.5, // Higher friction for feet to grip ground
+            density: 0.008,
+            frictionAir: 0.01,
+            friction: 0.7,  // High friction for ground gripping
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
         this.character.parts.rightLowerLeg = this.matter.add.image(x + 15, torsoY + 70, 'leg', null, {
             label: 'rightLowerLeg',
-            density: 0.006,
-            frictionAir: 0.02,
-            friction: 0.5, // Higher friction for feet to grip ground
+            density: 0.008,
+            frictionAir: 0.01,
+            friction: 0.7,  // High friction for ground gripping
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
     }
@@ -306,38 +322,41 @@ class GameScene extends Phaser.Scene {
     handleCharacterControl() {
         if (!this.gameActive || this.isPaused) return;
 
-        const force = 0.05;
+        // QWOP controls with adjusted forces
+        const legForce = 0.04;   // Force for legs
+        const armForce = 0.015;  // Reduced force for arms (1/3 of leg force)
 
         // Thigh controls (Q and W)
         if (this.keys.q.isDown) {
             // Q: Right thigh forward, left thigh backward
-            this.character.parts.rightUpperLeg.applyForce({ x: force, y: 0 });
-            this.character.parts.leftUpperLeg.applyForce({ x: -force, y: 0 });
+            this.character.parts.rightUpperLeg.applyForce({ x: legForce, y: 0 });
+            this.character.parts.leftUpperLeg.applyForce({ x: -legForce/2, y: 0 });
         }
 
         if (this.keys.w.isDown) {
             // W: Left thigh forward, right thigh backward
-            this.character.parts.leftUpperLeg.applyForce({ x: force, y: 0 });
-            this.character.parts.rightUpperLeg.applyForce({ x: -force, y: 0 });
+            this.character.parts.leftUpperLeg.applyForce({ x: legForce, y: 0 });
+            this.character.parts.rightUpperLeg.applyForce({ x: -legForce/2, y: 0 });
         }
 
         // Calf controls (O and P)
         if (this.keys.o.isDown) {
             // O: Right calf forward, left calf backward
-            this.character.parts.rightLowerLeg.applyForce({ x: force, y: 0 });
-            this.character.parts.leftLowerLeg.applyForce({ x: -force, y: 0 });
+            this.character.parts.rightLowerLeg.applyForce({ x: legForce, y: -legForce/4 });
+            this.character.parts.leftLowerLeg.applyForce({ x: -legForce/2, y: 0 });
         }
 
         if (this.keys.p.isDown) {
             // P: Left calf forward, right calf backward
-            this.character.parts.leftLowerLeg.applyForce({ x: force, y: 0 });
-            this.character.parts.rightLowerLeg.applyForce({ x: -force, y: 0 });
+            this.character.parts.leftLowerLeg.applyForce({ x: legForce, y: -legForce/4 });
+            this.character.parts.rightLowerLeg.applyForce({ x: -legForce/2, y: 0 });
         }
 
-        // Arm control (SPACE) - swing both arms forward
-        if (this.keys.space.isDown) {
-            this.character.parts.leftUpperArm.applyForce({ x: force, y: -force/2 });
-            this.character.parts.rightUpperArm.applyForce({ x: force, y: -force/2 });
+        // Space for arm defense (with cooldown)
+        if (this.keys.space.isDown && (!this.lastArmSwing || this.time.now - this.lastArmSwing > 1000)) {
+            this.character.parts.leftUpperArm.applyForce({ x: armForce, y: -armForce });
+            this.character.parts.rightUpperArm.applyForce({ x: armForce, y: -armForce });
+            this.lastArmSwing = this.time.now;
         }
     }
 
@@ -449,7 +468,7 @@ class GameScene extends Phaser.Scene {
     //-------------------------------------------------------------------------
 
     createEnemy(x, y) {
-        // Create enemy with more noticeable appearance
+        // Create enemy with better appearance
         this.enemy = this.matter.add.image(x, y, 'enemy', null, {
             label: 'enemy',
             density: 0.005,
@@ -458,12 +477,12 @@ class GameScene extends Phaser.Scene {
         });
 
         // Make enemy slightly larger
-        this.enemy.setScale(1.2);
+        this.enemy.setScale(1.5);
 
-        // Create invisible mouth part at the front of the enemy
-        const mouthSize = { width: 20, height: 10 };
+        // Create visible mouth part
+        const mouthSize = { width: 30, height: 15 };
         this.enemyMouth = this.matter.add.rectangle(
-            x - 20,
+            x - 30, // Position at the front
             y,
             mouthSize.width,
             mouthSize.height,
@@ -474,37 +493,50 @@ class GameScene extends Phaser.Scene {
             }
         );
 
-        // Connect mouth to enemy body
+        // Connect mouth to enemy
         this.matter.add.joint(this.enemy, this.enemyMouth, 0, 1);
 
         // Store enemy properties
-        this.enemy.speed = 0.001; // Faster speed to make it more threatening
+        this.enemy.speed = 0.001;
         this.enemy.mouth = this.enemyMouth;
-
-        // Add pulsing effect to make enemy more noticeable
-        this.tweens.add({
-            targets: this.enemy,
-            alpha: 0.8,
-            duration: 500,
-            yoyo: true,
-            repeat: -1
-        });
     }
 
+    // Respawn enemy when player moves to a new screen section
     updateEnemies() {
         // Skip if enemy is inactive
-        if (!this.enemy || !this.enemy.active) return;
+        if (!this.enemy || !this.enemy.active) {
+            // Respawn enemy if it was destroyed
+            const playerX = this.character.parts.torso.x;
+            this.createEnemy(playerX + 400, this.groundTop - 50);
+            return;
+        }
+
+        // Check if enemy is too far behind or ahead
+        const playerX = this.character.parts.torso.x;
+        const cameraX = this.cameras.main.scrollX;
+
+        if (this.enemy.x < cameraX - 100 || this.enemy.x > cameraX + 900) {
+            // Reposition enemy ahead of player
+            this.enemy.destroy();
+            if (this.enemyMouth) {
+                this.matter.world.remove(this.enemyMouth);
+            }
+
+            // Create new enemy ahead of player
+            this.createEnemy(playerX + 400, this.groundTop - 50);
+            return;
+        }
 
         // Move enemy toward player
-        const dx = this.character.parts.torso.x - this.enemy.x;
-        const speed = 0.002; // Increased from 0.0005 to be more noticeable
+        const dx = playerX - this.enemy.x;
+        const speed = 0.001;
 
         // Apply horizontal force toward player
         this.enemy.applyForce({ x: Math.sign(dx) * speed, y: 0 });
 
         // Update mouth position
         if (this.enemyMouth) {
-            const mouthOffset = dx > 0 ? 20 : -20;
+            const mouthOffset = dx > 0 ? 30 : -30;
             this.matter.body.setPosition(this.enemyMouth, {
                 x: this.enemy.x + mouthOffset,
                 y: this.enemy.y
@@ -516,17 +548,18 @@ class GameScene extends Phaser.Scene {
     // Safe House
     //-------------------------------------------------------------------------
 
+    // Replace safehouse creation with camera setup
     createSafehouse() {
-        this.safehouse = this.matter.add.image(700, this.groundTop - 40, 'safehouse', null, {
-            isStatic: true,
-            label: 'safehouse'
-        });
+        // Set camera to follow the player
+        this.cameras.main.startFollow(this.character.parts.torso, true, 0.1, 0.1);
+        this.cameras.main.setFollowOffset(-200, 0); // Keep player to the left of center
     }
 
     //-------------------------------------------------------------------------
     // Collision Handling
     //-------------------------------------------------------------------------
 
+    // Update collision checks for finish line
     setupCollisions() {
         // Initialize torso ground contact tracker
         this.torsoGroundContact = null;
@@ -550,8 +583,8 @@ class GameScene extends Phaser.Scene {
                     return;
                 }
 
-                // Check for reaching safehouse
-                if (this.isCollisionBetween(pair, 'torso', 'safehouse')) {
+                // Check for reaching finish line
+                if (this.isCollisionBetween(pair, 'torso', 'finishLine')) {
                     this.winGame();
                     return;
                 }
@@ -564,22 +597,50 @@ class GameScene extends Phaser.Scene {
                     const enemy = isEnemy(bodyA) ? bodyA.gameObject : bodyB.gameObject;
 
                     // Strong pushback when hitting enemy with arms
-                    const pushForce = 0.001; // Increased force for more noticeable effect
+                    const pushForce = 0.003; // Increased for visual effect
                     const direction = isArm(bodyA) ? 1 : -1;
 
-                    // Apply stronger push force to enemy
+                    // Apply push force to enemy
                     enemy.applyForce({ x: direction * pushForce, y: -pushForce/2 });
 
                     // Visual feedback
-                    this.cameras.main.shake(100, 0.01);
+                    this.cameras.main.shake(200, 0.01);
 
-                    // Play feedback sound if you want to add sound later
-                    console.log("Enemy hit!");
+                    // Flash enemy to show impact
+                    this.tweens.add({
+                        targets: enemy,
+                        alpha: 0.5,
+                        duration: 50,
+                        yoyo: true,
+                        repeat: 3
+                    });
+                }
+
+                // Check for enemy mouth contact with character parts for damage
+                if (bodyA.label === 'enemyMouth' || bodyB.label === 'enemyMouth') {
+                    const otherBody = bodyA.label === 'enemyMouth' ? bodyB : bodyA;
+
+                    // Skip if not a character part
+                    if (!otherBody.label || (!otherBody.label.includes('Arm') && !otherBody.label.includes('Leg'))) {
+                        return;
+                    }
+
+                    // Find the limb game object
+                    const limb = otherBody.gameObject;
+                    if (limb && limb.active) {
+                        this.damageLimb(limb);
+
+                        // Strong camera shake for damage
+                        this.cameras.main.shake(300, 0.03);
+
+                        // Flash red to indicate damage
+                        this.cameras.main.flash(100, 255, 0, 0, 0.3);
+                    }
                 }
             });
         });
 
-        // Add collision end detection to reset torso ground contact
+        // Add collision end detection
         this.matter.world.on('collisionend', (event) => {
             event.pairs.forEach((pair) => {
                 if (this.isCollisionBetween(pair, 'torso', 'ground')) {
@@ -763,55 +824,52 @@ class GameScene extends Phaser.Scene {
     // UI Elements
     //-------------------------------------------------------------------------
 
+    // Simplified UI setup - remove debug text, keep only essential instructions
     setupGameUI() {
-        // Add instructions text for QWOP controls
-        this.add.text(400, 30, 'ESC to pause, R to reset', {
-            fontSize: '16px',
-            fill: '#fff'
-        }).setOrigin(0.5);
-
-        this.add.text(400, 70, 'Classic QWOP controls:\nQ/W: Thighs, O/P: Calves\nSPACE: Swing arms to defend', {
-            fontSize: '16px',
-            fill: '#fff',
-            align: 'center'
-        }).setOrigin(0.5);
-
-        // Add debug text
-        this.debugText = this.add.text(20, 20, '', {
-            fontSize: '14px',
-            fill: '#ff0',
-            backgroundColor: '#333',
-            padding: { x: 5, y: 5 }
-        });
-
-        // Create simpler limb labels
-        this.createLimbLabels();
-    }
-
-    // Simpler limb labels
-    createLimbLabels() {
-        const createLabel = (limb, text) => {
-            if (!limb || !limb.active) return;
-
-            const style = {
+        // Add simple instruction text
+        const instructionText = this.add.text(400, 30,
+            'QWOP Controls: Q/W move thighs, O/P move calves\nSPACE to swing arms and defend', {
                 fontSize: '16px',
                 fill: '#fff',
-                backgroundColor: '#000',
-                padding: { x: 3, y: 2 }
-            };
+                align: 'center',
+                backgroundColor: '#000000AA',
+                padding: { x: 10, y: 5 }
+            }).setOrigin(0.5);
+        instructionText.setScrollFactor(0); // Fix to camera
 
-            const label = this.add.text(limb.x, limb.y, text, style);
-            label.setOrigin(0.5);
-            label.setDepth(10);
+        // Add distance marker
+        this.distanceText = this.add.text(400, 70, 'Distance: 0m', {
+            fontSize: '20px',
+            fill: '#fff',
+            backgroundColor: '#000000AA',
+            padding: { x: 10, y: 5 }
+        }).setOrigin(0.5);
+        this.distanceText.setScrollFactor(0); // Fix to camera
+    }
 
-            limb.controlLabel = label;
-        };
+    // Show simplified limb labels
+    createLimbLabels() {
+        // Just label the main control points with small indicators
+        const labels = [
+            { part: 'leftUpperLeg', text: 'W' },
+            { part: 'rightUpperLeg', text: 'Q' },
+            { part: 'leftLowerLeg', text: 'P' },
+            { part: 'rightLowerLeg', text: 'O' }
+        ];
 
-        // Just label the main control points
-        createLabel(this.character.parts.leftUpperLeg, "W");
-        createLabel(this.character.parts.rightUpperLeg, "Q");
-        createLabel(this.character.parts.leftLowerLeg, "P");
-        createLabel(this.character.parts.rightLowerLeg, "O");
+        labels.forEach(({ part, text }) => {
+            const limb = this.character.parts[part];
+            if (limb && limb.active) {
+                const label = this.add.text(limb.x, limb.y, text, {
+                    fontSize: '14px',
+                    fill: '#fff',
+                    backgroundColor: '#000000AA',
+                    padding: { x: 2, y: 1 }
+                }).setOrigin(0.5);
+
+                limb.controlLabel = label;
+            }
+        });
     }
 
     updateLimbLabels() {

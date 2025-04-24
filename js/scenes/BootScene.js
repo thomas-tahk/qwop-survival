@@ -22,14 +22,30 @@ class BootScene extends Phaser.Scene {
     }
 
     createPlaceholderAssets() {
-        // Create colored rectangles as placeholders
         this.createTextureRect('torso', 40, 80, 0x00ff00);
         this.createTextureRect('head', 30, 30, 0xffff00);
         this.createTextureRect('arm', 60, 15, 0xff0000);
-        this.createTextureRect('leg', 15, 60, 0x0000ff);
-        this.createTextureRect('enemy', 40, 60, 0xff00ff);
+
+        // Create leg with foot
+        const legGraphics = this.make.graphics();
+        legGraphics.fillStyle(0x0000ff);
+        legGraphics.fillRect(0, 0, 15, 50); // Leg part
+        legGraphics.fillStyle(0x0088ff);
+        legGraphics.fillRect(-5, 50, 25, 10); // Foot part sticking out
+        legGraphics.generateTexture('leg', 25, 60);
+        legGraphics.clear();
+
+        // Create enemy with "mouth"
+        const enemyGraphics = this.make.graphics();
+        enemyGraphics.fillStyle(0xff00ff);
+        enemyGraphics.fillRect(0, 0, 50, 70); // Main body
+        enemyGraphics.fillStyle(0xffffff);
+        enemyGraphics.fillRect(0, 30, 15, 10); // White "teeth"
+        enemyGraphics.generateTexture('enemy', 65, 70);
+        enemyGraphics.clear();
+
         this.createTextureRect('ground', 800, 40, 0x663300);
-        this.createTextureRect('safehouse', 80, 80, 0x00ffff);
+        this.createTextureRect('finishLine', 10, 120, 0xffff00);
     }
 
     createTextureRect(name, width, height, color) {
