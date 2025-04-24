@@ -121,9 +121,9 @@ class GameScene extends Phaser.Scene {
         // Create torso
         this.character.parts.torso = this.matter.add.image(x, torsoY, 'torso', null, {
             label: 'torso',
-            density: 0.01,
-            frictionAir: 0.01,
-            friction: 0.2,
+            density: 0.012, // Slightly heavier
+            frictionAir: 0.02, // More air resistance
+            friction: 0.3, // More ground friction
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
@@ -165,35 +165,35 @@ class GameScene extends Phaser.Scene {
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
-        // Create upper legs - CLOSER TOGETHER to prevent splits
-        this.character.parts.leftUpperLeg = this.matter.add.image(x - 10, torsoY + 30, 'leg', null, {
+        // and lower legs to use lowerLeg texture
+        this.character.parts.leftUpperLeg = this.matter.add.image(x - 10, torsoY + 30, 'upperLeg', null, {
             label: 'leftUpperLeg',
             density: 0.007,
             frictionAir: 0.01,
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
-        this.character.parts.rightUpperLeg = this.matter.add.image(x + 10, torsoY + 30, 'leg', null, {
+        this.character.parts.rightUpperLeg = this.matter.add.image(x + 10, torsoY + 30, 'upperLeg', null, {
             label: 'rightUpperLeg',
             density: 0.007,
             frictionAir: 0.01,
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
-        // Create lower legs - CLOSER TOGETHER to prevent splits
-        this.character.parts.leftLowerLeg = this.matter.add.image(x - 10, torsoY + 70, 'leg', null, {
+// Create lower legs with proper feet
+        this.character.parts.leftLowerLeg = this.matter.add.image(x - 10, torsoY + 70, 'lowerLeg', null, {
             label: 'leftLowerLeg',
-            density: 0.008,
-            frictionAir: 0.01,
-            friction: 0.7,
+            density: 0.009,
+            frictionAir: 0.02,
+            friction: 0.9, // High ground friction for better stability
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
-        this.character.parts.rightLowerLeg = this.matter.add.image(x + 10, torsoY + 70, 'leg', null, {
+        this.character.parts.rightLowerLeg = this.matter.add.image(x + 10, torsoY + 70, 'lowerLeg', null, {
             label: 'rightLowerLeg',
-            density: 0.008,
-            frictionAir: 0.01,
-            friction: 0.7,
+            density: 0.009,
+            frictionAir: 0.02,
+            friction: 0.9, // High ground friction for better stability
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
     }
@@ -360,15 +360,39 @@ class GameScene extends Phaser.Scene {
             this.character.parts.rightLowerLeg.applyForce({ x: -legForce/2, y: 0 });
         }
 
-        // Space for arm control - stronger force
+        // Space for arm control - synchronized punch motion
         if (this.keys.space.isDown) {
-            if (!this.lastArmSwing || this.time.now - this.lastArmSwing > 300) {
+            if (!this.lastArmSwing || this.time.now - this.lastArmSwing > 250) {
+                const punchForce = 0.25; // Very high force for dramatic movement
+
+                // Forward thrust for both arms simultaneously
                 if (this.character.parts.leftUpperArm && this.character.parts.leftUpperArm.active) {
-                    this.character.parts.leftUpperArm.applyForce({ x: armForce, y: -armForce });
+                    // Reset arm position first with a backward force
+                    this.character.parts.leftUpperArm.applyForce({ x: -punchForce/4, y: 0 });
+
+                    // Then apply forward punch force after a tiny delay
+                    this.time.delayedCall(50, () => {
+                        if (this.character.parts.leftUpperArm && this.character.parts.leftUpperArm.active) {
+                            this.character.parts.leftUpperArm.applyForce({ x: punchForce * 1.5, y: -punchForce/2 });
+                        }
+                    });
                 }
 
                 if (this.character.parts.rightUpperArm && this.character.parts.rightUpperArm.active) {
-                    this.character.parts.rightUpperArm.applyForce({ x: armForce, y: -armForce });
+                    // Reset arm position first with a backward force
+                    this.character.parts.rightUpperArm.applyForce({ x: -punchForce/4, y: 0 });
+
+                    // Then apply forward punch force after a tiny delay
+                    this.time.delayedCall(50, () => {
+                        if (this.character.parts.rightUpperArm && this.character.parts.rightUpperArm.active) {
+                            this.character.parts.rightUpperArm.applyForce({ x: punchForce * 1.5, y: -punchForce/2 });
+                        }
+                    });
+                }
+
+                // Apply a minimal backward force to torso for recoil effect
+                if (this.character.parts.torso) {
+                    this.character.parts.torso.applyForce({ x: -punchForce/5, y: 0 });
                 }
 
                 this.lastArmSwing = this.time.now;
@@ -550,18 +574,19 @@ class GameScene extends Phaser.Scene {
         // Create enemy with better appearance
         this.enemy = this.matter.add.image(x, y, 'enemy', null, {
             label: 'enemy',
-            density: 0.005,
-            frictionAir: 0.05,
+            density: 0.008, // Heavier enemy
+            frictionAir: 0.02,
+            friction: 0.2,
             collisionFilter: { group: 0, category: 4, mask: 255 }
         });
 
-        // Make enemy slightly larger
-        this.enemy.setScale(1.5);
+        // Make enemy MUCH larger
+        this.enemy.setScale(2.0); // Bigger enemy = harder to vault over
 
         // Create visible mouth part
-        const mouthSize = { width: 30, height: 15 };
+        const mouthSize = { width: 40, height: 20 }; // Bigger mouth
         this.enemyMouth = this.matter.add.rectangle(
-            x - 30, // Position at the front
+            x - 40, // Position at the front
             y,
             mouthSize.width,
             mouthSize.height,
@@ -576,7 +601,7 @@ class GameScene extends Phaser.Scene {
         this.matter.add.joint(this.enemy, this.enemyMouth, 0, 1);
 
         // Store enemy properties
-        this.enemy.speed = 0.001;
+        this.enemy.speed = 0.002; // Faster enemy
         this.enemy.mouth = this.enemyMouth;
     }
 

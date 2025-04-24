@@ -26,14 +26,24 @@ class BootScene extends Phaser.Scene {
         this.createTextureRect('head', 30, 30, 0xffff00);
         this.createTextureRect('arm', 60, 15, 0xff0000);
 
-        // Create leg with MUCH wider foot
-        const legGraphics = this.make.graphics();
-        legGraphics.fillStyle(0x0000ff);
-        legGraphics.fillRect(0, 0, 15, 40); // Leg part - shorter
-        legGraphics.fillStyle(0x0088ff);
-        legGraphics.fillRect(-15, 40, 45, 15); // Foot part - much wider and flatter
-        legGraphics.generateTexture('leg', 45, 55);
-        legGraphics.clear();
+        // Create UPPER legs WITHOUT feet
+        const upperLegGraphics = this.make.graphics();
+        upperLegGraphics.fillStyle(0x0000ff);
+        upperLegGraphics.fillRect(0, 0, 15, 40);
+        upperLegGraphics.generateTexture('upperLeg', 15, 40);
+        upperLegGraphics.clear();
+
+        // Create LOWER legs WITH feet
+        const lowerLegGraphics = this.make.graphics();
+        lowerLegGraphics.fillStyle(0x0000ff);
+        lowerLegGraphics.fillRect(0, 0, 15, 40); // Leg part
+        lowerLegGraphics.fillStyle(0x0088ff);
+        lowerLegGraphics.fillRect(-15, 40, 45, 15); // Foot part - wider and flat
+        lowerLegGraphics.generateTexture('lowerLeg', 45, 55);
+        lowerLegGraphics.clear();
+
+        // Keep the old 'leg' texture for backward compatibility
+        this.createTextureRect('leg', 15, 60, 0x0000ff);
 
         // Create enemy with "mouth"
         const enemyGraphics = this.make.graphics();
