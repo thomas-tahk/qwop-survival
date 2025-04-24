@@ -50,6 +50,14 @@ class GameScene extends Phaser.Scene {
             this.distanceText.setText(`Distance: ${distance}m`);
         }
 
+        // Update limb health
+        if (this.updateLimbHealth && this.healthText) {
+            const activeLimbs = Object.keys(this.character.parts)
+                .filter(key => key !== 'torso' && key !== 'head' && this.character.parts[key] && this.character.parts[key].active)
+                .length;
+            this.healthText.setText(`Limbs: ${activeLimbs}/8`);
+        }
+
         // Check for game state changes
         this.checkGameState();
     }
@@ -59,29 +67,29 @@ class GameScene extends Phaser.Scene {
     //-------------------------------------------------------------------------
 
     setupWorld() {
-        // Create a wider ground for scrolling
+        // Create ground
         this.ground = this.matter.add.image(800, 580, 'ground', null, {
             isStatic: true,
             label: 'ground',
             friction: 0.5,
         });
-        this.ground.setScale(3, 1); // 3x wider for scrolling
+        this.ground.setScale(3, 1);
 
-        // Store ground top position for reference
         this.groundTop = this.ground.y - this.ground.height / 2;
 
-        // Setup camera
-        this.cameras.main.setBounds(0, 0, 800 * 2, 600); // 2 screen widths
-
-        // Set world bounds
+        // Setup camera & world bounds
+        this.cameras.main.setBounds(0, 0, 800 * 2, 600);
         this.matter.world.setBounds(0, 0, 800 * 2, 600);
 
-        // Create finish line at the end
+        // Create a MUCH larger finish line for easier detection
         this.finishLine = this.matter.add.image(800 * 2 - 100, this.groundTop - 60, 'finishLine', null, {
             isStatic: true,
             label: 'finishLine',
-            isSensor: true
+            isSensor: true // Important: makes it a sensor instead of solid
         });
+
+        // Make it 5x wider & taller for better detection
+        this.finishLine.setScale(5, 3);
     }
 
     //-------------------------------------------------------------------------
@@ -110,11 +118,11 @@ class GameScene extends Phaser.Scene {
     }
 
     createCharacterParts(x, torsoY) {
-        // Create torso with better stability
+        // Create torso
         this.character.parts.torso = this.matter.add.image(x, torsoY, 'torso', null, {
             label: 'torso',
-            density: 0.012,  // Slightly heavier for stability
-            frictionAir: 0.02, // Less air friction for better movement
+            density: 0.01,
+            frictionAir: 0.01,
             friction: 0.2,
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
@@ -130,15 +138,15 @@ class GameScene extends Phaser.Scene {
         // Create upper arms
         this.character.parts.leftUpperArm = this.matter.add.image(x - 30, torsoY - 20, 'arm', null, {
             label: 'leftUpperArm',
-            density: 0.003,  // Lighter arms
-            frictionAir: 0.03, // More air friction to limit momentum
+            density: 0.003,
+            frictionAir: 0.03,
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
         this.character.parts.rightUpperArm = this.matter.add.image(x + 30, torsoY - 20, 'arm', null, {
             label: 'rightUpperArm',
-            density: 0.003,  // Lighter arms
-            frictionAir: 0.03, // More air friction to limit momentum
+            density: 0.003,
+            frictionAir: 0.03,
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
@@ -157,35 +165,35 @@ class GameScene extends Phaser.Scene {
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
-        // Create upper legs (thighs) - heavier for better ground contact
-        this.character.parts.leftUpperLeg = this.matter.add.image(x - 15, torsoY + 30, 'leg', null, {
+        // Create upper legs - CLOSER TOGETHER to prevent splits
+        this.character.parts.leftUpperLeg = this.matter.add.image(x - 10, torsoY + 30, 'leg', null, {
             label: 'leftUpperLeg',
-            density: 0.007,  // Heavier legs
-            frictionAir: 0.01,  // Less air friction
+            density: 0.007,
+            frictionAir: 0.01,
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
-        this.character.parts.rightUpperLeg = this.matter.add.image(x + 15, torsoY + 30, 'leg', null, {
+        this.character.parts.rightUpperLeg = this.matter.add.image(x + 10, torsoY + 30, 'leg', null, {
             label: 'rightUpperLeg',
-            density: 0.007,  // Heavier legs
-            frictionAir: 0.01,  // Less air friction
+            density: 0.007,
+            frictionAir: 0.01,
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
-        // Create lower legs (calves) with high friction for gripping
-        this.character.parts.leftLowerLeg = this.matter.add.image(x - 15, torsoY + 70, 'leg', null, {
+        // Create lower legs - CLOSER TOGETHER to prevent splits
+        this.character.parts.leftLowerLeg = this.matter.add.image(x - 10, torsoY + 70, 'leg', null, {
             label: 'leftLowerLeg',
             density: 0.008,
             frictionAir: 0.01,
-            friction: 0.7,  // High friction for ground gripping
+            friction: 0.7,
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
-        this.character.parts.rightLowerLeg = this.matter.add.image(x + 15, torsoY + 70, 'leg', null, {
+        this.character.parts.rightLowerLeg = this.matter.add.image(x + 10, torsoY + 70, 'leg', null, {
             label: 'rightLowerLeg',
             density: 0.008,
             frictionAir: 0.01,
-            friction: 0.7,  // High friction for ground gripping
+            friction: 0.7,
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
     }
@@ -322,9 +330,9 @@ class GameScene extends Phaser.Scene {
     handleCharacterControl() {
         if (!this.gameActive || this.isPaused) return;
 
-        // QWOP controls with adjusted forces
-        const legForce = 0.04;   // Force for legs
-        const armForce = 0.015;  // Reduced force for arms (1/3 of leg force)
+        // QWOP controls with MUCH higher forces
+        const legForce = 0.1;   // 2.5x higher force
+        const armForce = 0.05;  // 2x higher force
 
         // Thigh controls (Q and W)
         if (this.keys.q.isDown) {
@@ -352,11 +360,47 @@ class GameScene extends Phaser.Scene {
             this.character.parts.rightLowerLeg.applyForce({ x: -legForce/2, y: 0 });
         }
 
-        // Space for arm defense (with cooldown)
-        if (this.keys.space.isDown && (!this.lastArmSwing || this.time.now - this.lastArmSwing > 1000)) {
-            this.character.parts.leftUpperArm.applyForce({ x: armForce, y: -armForce });
-            this.character.parts.rightUpperArm.applyForce({ x: armForce, y: -armForce });
-            this.lastArmSwing = this.time.now;
+        // Space for arm control - higher force and shorter cooldown
+        if (this.keys.space.isDown) {
+            const cooldownTime = 300; // Reduced from 500ms to 300ms
+
+            if (!this.lastArmSwing || this.time.now - this.lastArmSwing > cooldownTime) {
+                // Apply much stronger forces
+                if (this.character.parts.leftUpperArm && this.character.parts.leftUpperArm.active) {
+                    this.character.parts.leftUpperArm.applyForce({ x: armForce, y: -armForce });
+                }
+
+                if (this.character.parts.rightUpperArm && this.character.parts.rightUpperArm.active) {
+                    this.character.parts.rightUpperArm.applyForce({ x: armForce, y: -armForce });
+                }
+
+                this.lastArmSwing = this.time.now;
+                this.cameras.main.shake(100, 0.01); // More noticeable shake
+
+                // Add punch effect text
+                if (!this.punchText) {
+                    this.punchText = this.add.text(400, 200, "Punch!", {
+                        fontSize: '24px', // Larger text
+                        fill: '#ffffff',
+                        backgroundColor: '#ff6600ee', // More opaque
+                        padding: { x: 10, y: 5 }
+                    }).setOrigin(0.5);
+                    this.punchText.setScrollFactor(0);
+
+                    this.tweens.add({
+                        targets: this.punchText,
+                        alpha: 0,
+                        y: 180,
+                        duration: 300,
+                        onComplete: () => {
+                            if (this.punchText) {
+                                this.punchText.destroy();
+                                this.punchText = null;
+                            }
+                        }
+                    });
+                }
+            }
         }
     }
 
@@ -415,53 +459,116 @@ class GameScene extends Phaser.Scene {
     }
 
     damageLimb(limb) {
-        // Skip if already damaged recently (cooldown)
-        if (limb.damageTime && this.time.now - limb.damageTime < 1000) {
+        if (!limb || !limb.active) return;
+
+        // Longer cooldown protection
+        if (limb.damageTime && this.time.now - limb.damageTime < 1500) {
             return;
         }
 
-        // Set damage time
         limb.damageTime = this.time.now;
+        console.log("Damaging limb:", limb.label); // Debug output
 
         // Decrease health
+        if (typeof limb.health === 'undefined') {
+            limb.health = 3; // Ensure health is initialized
+        }
+
         limb.health--;
 
-        // Visual feedback
+        // More dramatic visual feedback
         this.tweens.add({
             targets: limb,
-            alpha: 0.5,
-            duration: 100,
+            alpha: 0.3,
+            duration: 150,
             yoyo: true,
-            repeat: 2
+            repeat: 3
         });
 
-        // If health depleted, remove limb
+        // Very obvious color change
+        if (limb.health === 2) {
+            limb.setTint(0xffaa00);
+        } else if (limb.health === 1) {
+            limb.setTint(0xff0000);
+        }
+
+        // If health depleted, remove limb with particles
         if (limb.health <= 0) {
-            // Find the corresponding key in character.parts
-            const limbKey = Object.keys(this.character.parts).find(key => this.character.parts[key] === limb);
+            // Find limb key
+            const limbKey = Object.keys(this.character.parts)
+                .find(key => this.character.parts[key] === limb);
 
             if (limbKey) {
-                // Remove the limb
+                // Add particles at limb position
+                const particles = this.add.particles(limb.x, limb.y, 'head', {
+                    speed: { min: 50, max: 200 },
+                    scale: { start: 0.2, end: 0 },
+                    lifespan: 800,
+                    quantity: 15,
+                    blendMode: 'ADD'
+                });
+
+                // Auto-destroy particles
+                this.time.delayedCall(800, () => particles.destroy());
+
+                // Disable limb
                 limb.setActive(false).setVisible(false);
 
-                // Remove label if it exists
+                // Remove control label if exists
                 if (limb.controlLabel) {
                     limb.controlLabel.destroy();
                 }
 
+                // Clear reference
                 this.character.parts[limbKey] = null;
 
-                // Check if all limbs are gone
-                const hasLimbs = ['leftArm', 'rightArm', 'leftLeg', 'rightLeg'].some(
-                    part => this.character.parts[part] && this.character.parts[part].active
-                );
+                // Very obvious notification
+                const lostText = this.add.text(400, 250, `LOST ${limbKey}!`, {
+                    fontSize: '36px',
+                    fontStyle: 'bold',
+                    fill: '#ff0000',
+                    backgroundColor: '#000000',
+                    padding: { x: 15, y: 10 }
+                }).setOrigin(0.5);
+                lostText.setScrollFactor(0);
 
-                if (!hasLimbs) {
-                    this.gameOver("Lost all limbs!");
+                // Fade out notification
+                this.tweens.add({
+                    targets: lostText,
+                    alpha: 0,
+                    y: 200,
+                    duration: 2000,
+                    onComplete: () => lostText.destroy()
+                });
+
+                // Game over if too many limbs lost
+                const activeLimbs = ['leftUpperArm', 'rightUpperArm', 'leftUpperLeg', 'rightUpperLeg']
+                    .filter(part => this.character.parts[part] && this.character.parts[part].active)
+                    .length;
+
+                if (activeLimbs < 2) {
+                    this.gameOver("Too many limbs lost!");
                 }
             }
         }
     }
+
+    createBrokenLimbEffect(x, y, limbKey) {
+        // Create particles for broken limb effect
+        const particles = this.add.particles(x, y, 'head', { // Using head texture as particle
+            speed: 100,
+            scale: { start: 0.2, end: 0 },
+            blendMode: 'ADD',
+            lifespan: 500,
+            quantity: 10
+        });
+
+        // Auto-destroy after animation completes
+        this.time.delayedCall(500, () => {
+            particles.destroy();
+        });
+    }
+
 
     //-------------------------------------------------------------------------
     // Enemy Creation and Control
@@ -505,18 +612,18 @@ class GameScene extends Phaser.Scene {
     updateEnemies() {
         // Skip if enemy is inactive
         if (!this.enemy || !this.enemy.active) {
-            // Respawn enemy if it was destroyed
+            // Respawn enemy
             const playerX = this.character.parts.torso.x;
             this.createEnemy(playerX + 400, this.groundTop - 50);
             return;
         }
 
-        // Check if enemy is too far behind or ahead
+        // Check if enemy is too far
         const playerX = this.character.parts.torso.x;
         const cameraX = this.cameras.main.scrollX;
 
         if (this.enemy.x < cameraX - 100 || this.enemy.x > cameraX + 900) {
-            // Reposition enemy ahead of player
+            // Reposition enemy
             this.enemy.destroy();
             if (this.enemyMouth) {
                 this.matter.world.remove(this.enemyMouth);
@@ -527,11 +634,11 @@ class GameScene extends Phaser.Scene {
             return;
         }
 
-        // Move enemy toward player
-        const dx = playerX - this.enemy.x;
-        const speed = 0.001;
+        // MUCH more aggressive enemy movement
+        const dx = this.character.parts.torso.x - this.enemy.x;
+        const speed = 0.003; // 3x faster than before
 
-        // Apply horizontal force toward player
+        // Apply force toward player
         this.enemy.applyForce({ x: Math.sign(dx) * speed, y: 0 });
 
         // Update mouth position
@@ -583,10 +690,14 @@ class GameScene extends Phaser.Scene {
                     return;
                 }
 
-                // Check for reaching finish line
-                if (this.isCollisionBetween(pair, 'torso', 'finishLine')) {
+                // Check if ANY part of the character touches the finish line
+                if ((bodyA.label === 'finishLine' && bodyB.gameObject &&
+                        Object.values(this.character.parts).includes(bodyB.gameObject)) ||
+                    (bodyB.label === 'finishLine' && bodyA.gameObject &&
+                        Object.values(this.character.parts).includes(bodyA.gameObject))) {
+
+                    console.log("Finish line reached!"); // Debug output
                     this.winGame();
-                    return;
                 }
 
                 // Check for arm collisions with enemy - more effective pushback
@@ -616,25 +727,31 @@ class GameScene extends Phaser.Scene {
                     });
                 }
 
-                // Check for enemy mouth contact with character parts for damage
+                // Check for enemy mouth contact with character parts
                 if (bodyA.label === 'enemyMouth' || bodyB.label === 'enemyMouth') {
                     const otherBody = bodyA.label === 'enemyMouth' ? bodyB : bodyA;
 
-                    // Skip if not a character part
-                    if (!otherBody.label || (!otherBody.label.includes('Arm') && !otherBody.label.includes('Leg'))) {
-                        return;
-                    }
+                    // More aggressive check for ANY limb part
+                    if (otherBody.gameObject && otherBody.label &&
+                        (otherBody.label.includes('Arm') || otherBody.label.includes('Leg'))) {
 
-                    // Find the limb game object
-                    const limb = otherBody.gameObject;
-                    if (limb && limb.active) {
-                        this.damageLimb(limb);
+                        // Apply strong force to torso for feedback
+                        if (this.character.parts.torso) {
+                            this.character.parts.torso.applyForce({
+                                x: -0.05, // Much stronger pushback
+                                y: -0.02
+                            });
+                        }
 
-                        // Strong camera shake for damage
-                        this.cameras.main.shake(300, 0.03);
+                        // Damage with more dramatic feedback
+                        this.damageLimb(otherBody.gameObject);
+                        this.cameras.main.shake(300, 0.05); // More intense shake
+                        this.cameras.main.flash(200, 255, 0, 0, 0.5); // More visible flash
 
-                        // Flash red to indicate damage
-                        this.cameras.main.flash(100, 255, 0, 0, 0.3);
+                        // Make sure the enemy isn't stuck
+                        if (this.enemy) {
+                            this.enemy.applyForce({ x: -0.01, y: -0.005 });
+                        }
                     }
                 }
             });
@@ -718,19 +835,19 @@ class GameScene extends Phaser.Scene {
             return;
         }
 
-        // Check for out of bounds
+        // Check out of bounds
         if (this.character.parts.torso) {
             const torsoX = this.character.parts.torso.x;
             const torsoY = this.character.parts.torso.y;
 
-            if (torsoX < 0 || torsoX > 800 || torsoY < 0 || torsoY > 600) {
+            if (torsoX < 0 || torsoX > 800 * 2 || torsoY < 0 || torsoY > 600) {
                 this.gameOver("Out of bounds!");
                 return;
             }
         }
 
-        // Check for tilt (if torso is too rotated)
-        if (this.character.parts.torso && Math.abs(this.character.parts.torso.rotation) > 1.8) {
+        // More sensitive rotation check - fall over more easily
+        if (this.character.parts.torso && Math.abs(this.character.parts.torso.rotation) > 1.3) { // Reduced from 1.8
             this.gameOver("Character fell over!");
             return;
         }
@@ -828,7 +945,7 @@ class GameScene extends Phaser.Scene {
     setupGameUI() {
         // Add simple instruction text
         const instructionText = this.add.text(400, 30,
-            'QWOP Controls: Q/W move thighs, O/P move calves\nSPACE to swing arms and defend', {
+            'QWOP Controls: Q/W move thighs, O/P move calves\nSPACE to punch - use it to defend!', {
                 fontSize: '16px',
                 fill: '#fff',
                 align: 'center',
@@ -845,6 +962,18 @@ class GameScene extends Phaser.Scene {
             padding: { x: 10, y: 5 }
         }).setOrigin(0.5);
         this.distanceText.setScrollFactor(0); // Fix to camera
+
+        // Add limb health indicator
+        this.healthText = this.add.text(400, 100, 'Limbs: 8/8', {
+            fontSize: '16px',
+            fill: '#fff',
+            backgroundColor: '#000000AA',
+            padding: { x: 10, y: 5 }
+        }).setOrigin(0.5);
+        this.healthText.setScrollFactor(0);
+
+        // Update limb health in update function
+        this.updateLimbHealth = true;
     }
 
     // Show simplified limb labels
