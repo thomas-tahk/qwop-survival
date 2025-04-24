@@ -44,9 +44,9 @@ class GameScene extends Phaser.Scene {
         this.updateEnemies();
         this.updateLimbLabels();
 
-        // Update distance marker
+        // Update distance marker - adjusted to start from 0
         if (this.character && this.character.parts.torso) {
-            const distance = Math.max(0, Math.floor(this.character.parts.torso.x / 10));
+            const distance = Math.max(0, Math.floor((this.character.parts.torso.x - 200) / 10));
             this.distanceText.setText(`Distance: ${distance}m`);
         }
 
@@ -330,33 +330,37 @@ class GameScene extends Phaser.Scene {
     handleCharacterControl() {
         if (!this.gameActive || this.isPaused) return;
 
-        // Simplified QWOP controls with higher forces
-        const legForce = 0.08;
-        const armForce = 0.04;
+        // MUCH higher forces for more dramatic movement
+        const legForce = 0.15;   // Significantly increased force
+        const armForce = 0.1;    // Significantly increased force
 
         // Thigh controls (Q and W)
         if (this.keys.q.isDown) {
+            // Q: Right thigh forward, left thigh backward
             this.character.parts.rightUpperLeg.applyForce({ x: legForce, y: 0 });
             this.character.parts.leftUpperLeg.applyForce({ x: -legForce/2, y: 0 });
         }
 
         if (this.keys.w.isDown) {
+            // W: Left thigh forward, right thigh backward
             this.character.parts.leftUpperLeg.applyForce({ x: legForce, y: 0 });
             this.character.parts.rightUpperLeg.applyForce({ x: -legForce/2, y: 0 });
         }
 
         // Calf controls (O and P)
         if (this.keys.o.isDown) {
+            // O: Right calf forward, left calf backward
             this.character.parts.rightLowerLeg.applyForce({ x: legForce, y: -legForce/4 });
             this.character.parts.leftLowerLeg.applyForce({ x: -legForce/2, y: 0 });
         }
 
         if (this.keys.p.isDown) {
+            // P: Left calf forward, right calf backward
             this.character.parts.leftLowerLeg.applyForce({ x: legForce, y: -legForce/4 });
             this.character.parts.rightLowerLeg.applyForce({ x: -legForce/2, y: 0 });
         }
 
-        // Space for arm control - without distracting text
+        // Space for arm control - stronger force
         if (this.keys.space.isDown) {
             if (!this.lastArmSwing || this.time.now - this.lastArmSwing > 300) {
                 if (this.character.parts.leftUpperArm && this.character.parts.leftUpperArm.active) {
@@ -368,7 +372,6 @@ class GameScene extends Phaser.Scene {
                 }
 
                 this.lastArmSwing = this.time.now;
-                // No shake or text display
             }
         }
     }
