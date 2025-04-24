@@ -34,7 +34,7 @@ class GameScene extends Phaser.Scene {
         // Setup UI
         this.setupGameUI();
 
-        this.playerHealth = 3;
+        this.playerHealth = 5;
     }
 
     // Add distance tracking in update
@@ -50,14 +50,6 @@ class GameScene extends Phaser.Scene {
         if (this.character && this.character.parts.torso) {
             const distance = Math.max(0, Math.floor((this.character.parts.torso.x - 200) / 10));
             this.distanceText.setText(`Distance: ${distance}m`);
-        }
-
-        // Update limb health
-        if (this.updateLimbHealth && this.healthText) {
-            const activeLimbs = Object.keys(this.character.parts)
-                .filter(key => key !== 'torso' && key !== 'head' && this.character.parts[key] && this.character.parts[key].active)
-                .length;
-            this.healthText.setText(`Limbs: ${activeLimbs}/8`);
         }
 
         // Check for game state changes
@@ -101,8 +93,7 @@ class GameScene extends Phaser.Scene {
     createCharacter(x, groundY) {
         // Character group - for tracking all body parts
         this.character = {
-            parts: {},
-            health: 10
+            parts: {}
         };
 
         // Calculate positions
@@ -480,117 +471,6 @@ class GameScene extends Phaser.Scene {
                 upperLimb.cooldown = 1; // Reduced for more responsive controls
             }
         }
-    }
-
-    damageLimb(limb) {
-        if (!limb || !limb.active) return;
-
-        // Longer cooldown protection
-        if (limb.damageTime && this.time.now - limb.damageTime < 1500) {
-            return;
-        }
-
-        limb.damageTime = this.time.now;
-        console.log("Damaging limb:", limb.label); // Debug output
-
-        // Decrease health
-        if (typeof limb.health === 'undefined') {
-            limb.health = 3; // Ensure health is initialized
-        }
-
-        limb.health--;
-
-        // More dramatic visual feedback
-        this.tweens.add({
-            targets: limb,
-            alpha: 0.3,
-            duration: 150,
-            yoyo: true,
-            repeat: 3
-        });
-
-        // Very obvious color change
-        if (limb.health === 2) {
-            limb.setTint(0xffaa00);
-        } else if (limb.health === 1) {
-            limb.setTint(0xff0000);
-        }
-
-        // If health depleted, remove limb with particles
-        if (limb.health <= 0) {
-            // Find limb key
-            const limbKey = Object.keys(this.character.parts)
-                .find(key => this.character.parts[key] === limb);
-
-            if (limbKey) {
-                // Add particles at limb position
-                const particles = this.add.particles(limb.x, limb.y, 'head', {
-                    speed: { min: 50, max: 200 },
-                    scale: { start: 0.2, end: 0 },
-                    lifespan: 800,
-                    quantity: 15,
-                    blendMode: 'ADD'
-                });
-
-                // Auto-destroy particles
-                this.time.delayedCall(800, () => particles.destroy());
-
-                // Disable limb
-                limb.setActive(false).setVisible(false);
-
-                // Remove control label if exists
-                if (limb.controlLabel) {
-                    limb.controlLabel.destroy();
-                }
-
-                // Clear reference
-                this.character.parts[limbKey] = null;
-
-                // Very obvious notification
-                const lostText = this.add.text(400, 250, `LOST ${limbKey}!`, {
-                    fontSize: '36px',
-                    fontStyle: 'bold',
-                    fill: '#ff0000',
-                    backgroundColor: '#000000',
-                    padding: { x: 15, y: 10 }
-                }).setOrigin(0.5);
-                lostText.setScrollFactor(0);
-
-                // Fade out notification
-                this.tweens.add({
-                    targets: lostText,
-                    alpha: 0,
-                    y: 200,
-                    duration: 2000,
-                    onComplete: () => lostText.destroy()
-                });
-
-                // Game over if too many limbs lost
-                const activeLimbs = ['leftUpperArm', 'rightUpperArm', 'leftUpperLeg', 'rightUpperLeg']
-                    .filter(part => this.character.parts[part] && this.character.parts[part].active)
-                    .length;
-
-                if (activeLimbs < 2) {
-                    this.gameOver("Too many limbs lost!");
-                }
-            }
-        }
-    }
-
-    createBrokenLimbEffect(x, y, limbKey) {
-        // Create particles for broken limb effect
-        const particles = this.add.particles(x, y, 'head', { // Using head texture as particle
-            speed: 100,
-            scale: { start: 0.2, end: 0 },
-            blendMode: 'ADD',
-            lifespan: 500,
-            quantity: 10
-        });
-
-        // Auto-destroy after animation completes
-        this.time.delayedCall(500, () => {
-            particles.destroy();
-        });
     }
 
 
@@ -1145,7 +1025,7 @@ class GameScene extends Phaser.Scene {
         }).setOrigin(0.5);
         this.distanceText.setScrollFactor(0); // Fix to camera
 
-        this.healthDisplay = this.add.text(400, 130, 'Health: 3', {
+        this.healthDisplay = this.add.text(400, 130, 'Health: 5', {
             fontSize: '16px',
             fill: '#fff',
             backgroundColor: '#000000AA',
