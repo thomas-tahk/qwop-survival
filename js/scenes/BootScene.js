@@ -45,14 +45,23 @@ class BootScene extends Phaser.Scene {
         // Keep the old 'leg' texture for backward compatibility
         this.createTextureRect('leg', 15, 60, 0x0000ff);
 
-        // Create enemy with "mouth"
+        // Create enemy with limbs
         const enemyGraphics = this.make.graphics();
+
+        // Main body
         enemyGraphics.fillStyle(0xff00ff);
-        enemyGraphics.fillRect(0, 0, 50, 70); // Main body
-        enemyGraphics.fillStyle(0xffffff);
-        enemyGraphics.fillRect(0, 30, 15, 10); // White "teeth"
-        enemyGraphics.generateTexture('enemy', 65, 70);
+        enemyGraphics.fillRect(0, 0, 50, 70);
+
+        // Arms/limbs
+        enemyGraphics.fillStyle(0xff77ff);
+        enemyGraphics.fillRect(-20, 20, 40, 10); // Left arm
+        enemyGraphics.fillRect(30, 20, 40, 10);  // Right arm
+
+        enemyGraphics.generateTexture('enemy', 90, 70);
         enemyGraphics.clear();
+
+        // Create enemy arm texture
+        this.createTextureRect('enemyArm', 40, 10, 0xff77ff);
 
         this.createTextureRect('ground', 800, 40, 0x663300);
         this.createTextureRect('finishLine', 10, 120, 0xffff00);

@@ -33,6 +33,8 @@ class GameScene extends Phaser.Scene {
 
         // Setup UI
         this.setupGameUI();
+
+        this.playerHealth = 3;
     }
 
     // Add distance tracking in update
@@ -115,6 +117,8 @@ class GameScene extends Phaser.Scene {
 
         // Set initial limb health
         this.initLimbHealth();
+
+        this.setupArmBobbing();
     }
 
     createCharacterParts(x, torsoY) {
@@ -135,30 +139,30 @@ class GameScene extends Phaser.Scene {
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
-        // Create upper arms
-        this.character.parts.leftUpperArm = this.matter.add.image(x - 30, torsoY - 20, 'arm', null, {
+        // In createCharacterParts, position arms in a guard/boxing stance
+        this.character.parts.leftUpperArm = this.matter.add.image(x - 25, torsoY - 30, 'arm', null, {
             label: 'leftUpperArm',
             density: 0.003,
             frictionAir: 0.03,
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
-        this.character.parts.rightUpperArm = this.matter.add.image(x + 30, torsoY - 20, 'arm', null, {
+        this.character.parts.rightUpperArm = this.matter.add.image(x + 25, torsoY - 30, 'arm', null, {
             label: 'rightUpperArm',
             density: 0.003,
             frictionAir: 0.03,
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
-        // Create lower arms (forearms)
-        this.character.parts.leftLowerArm = this.matter.add.image(x - 60, torsoY - 20, 'arm', null, {
+        // Position lower arms to be in a guard position
+        this.character.parts.leftLowerArm = this.matter.add.image(x - 40, torsoY - 50, 'arm', null, {
             label: 'leftLowerArm',
             density: 0.002,
             frictionAir: 0.03,
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
 
-        this.character.parts.rightLowerArm = this.matter.add.image(x + 60, torsoY - 20, 'arm', null, {
+        this.character.parts.rightLowerArm = this.matter.add.image(x + 40, torsoY - 50, 'arm', null, {
             label: 'rightLowerArm',
             density: 0.002,
             frictionAir: 0.03,
@@ -196,6 +200,7 @@ class GameScene extends Phaser.Scene {
             friction: 0.9, // High ground friction for better stability
             collisionFilter: { group: 0, category: 2, mask: 255 }
         });
+
     }
 
     createCharacterJoints() {
@@ -310,92 +315,96 @@ class GameScene extends Phaser.Scene {
             space: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
 
             // Game controls
-            esc: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC),
-            r: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R),
+            // r: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R),
 
             // Restart after game over
             restart: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE)
         };
 
         // Set up key events
-        this.keys.esc.on('down', () => {
-            this.togglePause();
-        });
+        // this.keys.r.on('down', () => {
+        //     this.resetGame();
+        // });
+    }
 
-        this.keys.r.on('down', () => {
-            this.resetGame();
+    setupArmBobbing() {
+        // Create a subtle bobbing effect for arms in guard position
+        this.armBobbingTween = this.tweens.add({
+            targets: [this.character.parts.leftLowerArm, this.character.parts.rightLowerArm],
+            y: '-=5', // Move up by 5 pixels
+            duration: 800,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
         });
     }
 
+    // Improve punch mechanics for jab-style punches
     handleCharacterControl() {
         if (!this.gameActive || this.isPaused) return;
 
-        // MUCH higher forces for more dramatic movement
-        const legForce = 0.15;   // Significantly increased force
-        const armForce = 0.1;    // Significantly increased force
+        // QWOP controls for legs remain the same
+        const legForce = 0.15;
 
         // Thigh controls (Q and W)
         if (this.keys.q.isDown) {
-            // Q: Right thigh forward, left thigh backward
             this.character.parts.rightUpperLeg.applyForce({ x: legForce, y: 0 });
             this.character.parts.leftUpperLeg.applyForce({ x: -legForce/2, y: 0 });
         }
 
         if (this.keys.w.isDown) {
-            // W: Left thigh forward, right thigh backward
             this.character.parts.leftUpperLeg.applyForce({ x: legForce, y: 0 });
             this.character.parts.rightUpperLeg.applyForce({ x: -legForce/2, y: 0 });
         }
 
         // Calf controls (O and P)
         if (this.keys.o.isDown) {
-            // O: Right calf forward, left calf backward
             this.character.parts.rightLowerLeg.applyForce({ x: legForce, y: -legForce/4 });
             this.character.parts.leftLowerLeg.applyForce({ x: -legForce/2, y: 0 });
         }
 
         if (this.keys.p.isDown) {
-            // P: Left calf forward, right calf backward
             this.character.parts.leftLowerLeg.applyForce({ x: legForce, y: -legForce/4 });
             this.character.parts.rightLowerLeg.applyForce({ x: -legForce/2, y: 0 });
         }
 
-        // Space for arm control - synchronized punch motion
-        if (this.keys.space.isDown) {
-            if (!this.lastArmSwing || this.time.now - this.lastArmSwing > 250) {
-                const punchForce = 0.25; // Very high force for dramatic movement
+        // handling punches
+        if (Phaser.Input.Keyboard.JustDown(this.keys.space)) {
+            // Alternate between left and right jabs
+            this.useLeftArm = !this.useLeftArm;
 
-                // Forward thrust for both arms simultaneously
-                if (this.character.parts.leftUpperArm && this.character.parts.leftUpperArm.active) {
-                    // Reset arm position first with a backward force
-                    this.character.parts.leftUpperArm.applyForce({ x: -punchForce/4, y: 0 });
+            // Get the arm to use
+            const upperArm = this.useLeftArm
+                ? this.character.parts.leftUpperArm
+                : this.character.parts.rightUpperArm;
 
-                    // Then apply forward punch force after a tiny delay
-                    this.time.delayedCall(50, () => {
-                        if (this.character.parts.leftUpperArm && this.character.parts.leftUpperArm.active) {
-                            this.character.parts.leftUpperArm.applyForce({ x: punchForce * 1.5, y: -punchForce/2 });
-                        }
-                    });
-                }
+            const lowerArm = this.useLeftArm
+                ? this.character.parts.leftLowerArm
+                : this.character.parts.rightLowerArm;
 
-                if (this.character.parts.rightUpperArm && this.character.parts.rightUpperArm.active) {
-                    // Reset arm position first with a backward force
-                    this.character.parts.rightUpperArm.applyForce({ x: -punchForce/4, y: 0 });
+            if (upperArm && upperArm.active && lowerArm && lowerArm.active) {
+                // Stronger jab force
+                const jabForce = 0.35; // Increased slightly
 
-                    // Then apply forward punch force after a tiny delay
-                    this.time.delayedCall(50, () => {
-                        if (this.character.parts.rightUpperArm && this.character.parts.rightUpperArm.active) {
-                            this.character.parts.rightUpperArm.applyForce({ x: punchForce * 1.5, y: -punchForce/2 });
-                        }
-                    });
-                }
+                // Apply jab forces - more direct punching action
+                upperArm.setVelocity(0, 0); // Clear existing velocity first
+                lowerArm.setVelocity(0, 0);
 
-                // Apply a minimal backward force to torso for recoil effect
-                if (this.character.parts.torso) {
-                    this.character.parts.torso.applyForce({ x: -punchForce/5, y: 0 });
-                }
+                // Apply stronger, more directed punch force
+                upperArm.applyForce({ x: jabForce * 0.3, y: -0.08 }); // Reduced forward momentum
+                lowerArm.applyForce({ x: jabForce * 0.5, y: -0.1 });  // Reduced forward momentum
 
-                this.lastArmSwing = this.time.now;
+                // Visual feedback for punch
+                this.tweens.add({
+                    targets: lowerArm,
+                    alpha: 0.7,
+                    duration: 50,
+                    yoyo: true,
+                    repeat: 1
+                });
+
+                // Small camera shake for impact
+                this.cameras.main.shake(100, 0.005);
             }
         }
     }
@@ -571,38 +580,102 @@ class GameScene extends Phaser.Scene {
     //-------------------------------------------------------------------------
 
     createEnemy(x, y) {
-        // Create enemy with better appearance
+        // Create enemy with arms/limbs
         this.enemy = this.matter.add.image(x, y, 'enemy', null, {
             label: 'enemy',
-            density: 0.008, // Heavier enemy
+            density: 0.008,
             frictionAir: 0.02,
             friction: 0.2,
             collisionFilter: { group: 0, category: 4, mask: 255 }
         });
 
-        // Make enemy MUCH larger
-        this.enemy.setScale(2.0); // Bigger enemy = harder to vault over
+        // Scale enemy
+        this.enemy.setScale(1.8);
+        this.enemy.setFriction(0.05); // Add surface friction
+        this.enemy.setFrictionAir(0.1); // Increase air friction to prevent sliding
+        this.enemy.setBounce(0); // Prevent bouncing entirely
+        // Make enemy face the right way (add right after creating the enemy)
+        if (x > this.character.parts.torso.x) {
+            this.enemy.setFlipX(true); // Face left if starting to the right of player
+        }
 
-        // Create visible mouth part
-        const mouthSize = { width: 40, height: 20 }; // Bigger mouth
-        this.enemyMouth = this.matter.add.rectangle(
-            x - 40, // Position at the front
-            y,
-            mouthSize.width,
-            mouthSize.height,
-            {
-                label: 'enemyMouth',
-                isSensor: true,
-                collisionFilter: { group: 0, category: 8, mask: 2 }
+        // Create enemy limbs that can interact with player
+        this.enemyLeftArm = this.matter.add.image(x - 40, y, 'enemyArm', null, {
+            label: 'enemyArm',
+            density: 0.003,
+            frictionAir: 0.01,
+            collisionFilter: { group: 0, category: 8, mask: 255 }
+        });
+
+        this.enemyRightArm = this.matter.add.image(x + 40, y, 'enemyArm', null, {
+            label: 'enemyArm',
+            density: 0.003,
+            frictionAir: 0.01,
+            collisionFilter: { group: 0, category: 8, mask: 255 }
+        });
+
+        // Connect arms to enemy body
+        this.matter.add.joint(this.enemy, this.enemyLeftArm, 10, 0.5, {
+            pointA: { x: -25, y: 0 },
+            pointB: { x: 20, y: 0 }
+        });
+
+        this.matter.add.joint(this.enemy, this.enemyRightArm, 10, 0.5, {
+            pointA: { x: 25, y: 0 },
+            pointB: { x: -20, y: 0 }
+        });
+
+        // Store for reference
+        this.enemy.leftArm = this.enemyLeftArm;
+        this.enemy.rightArm = this.enemyRightArm;
+        this.enemy.speed = 0.002;
+
+        // Set up enemy attack pattern
+        this.setupEnemyAttacks();
+    }
+
+    // Add enemy attack pattern method
+    setupEnemyAttacks() {
+        // Set up a timer for enemy attacks
+        this.enemyAttackTimer = this.time.addEvent({
+            delay: 2000, // Attack every 2 seconds
+            callback: this.enemyAttack,
+            callbackScope: this,
+            loop: true
+        });
+    }
+
+    // Enemy attack method
+    enemyAttack() {
+        if (!this.enemy || !this.enemy.active || !this.gameActive || this.isPaused) return;
+
+        // Get distance to player
+        const dx = this.character.parts.torso.x - this.enemy.x;
+        const distance = Math.abs(dx);
+
+        // Only attack if within range
+        if (distance < 150) {
+            // Determine which arm to use based on player position
+            const arm = dx > 0 ? this.enemy.rightArm : this.enemy.leftArm;
+
+            if (arm && arm.active) {
+                // Apply punch force
+                const punchForce = 0.02;
+                arm.applyForce({
+                    x: Math.sign(dx) * punchForce,
+                    y: -punchForce/2
+                });
+
+                // Visual feedback
+                this.tweens.add({
+                    targets: arm,
+                    alpha: 0.6,
+                    duration: 50,
+                    yoyo: true,
+                    repeat: 1
+                });
             }
-        );
-
-        // Connect mouth to enemy
-        this.matter.add.joint(this.enemy, this.enemyMouth, 0, 1);
-
-        // Store enemy properties
-        this.enemy.speed = 0.002; // Faster enemy
-        this.enemy.mouth = this.enemyMouth;
+        }
     }
 
     // Respawn enemy when player moves to a new screen section
@@ -620,31 +693,39 @@ class GameScene extends Phaser.Scene {
         const cameraX = this.cameras.main.scrollX;
 
         if (this.enemy.x < cameraX - 100 || this.enemy.x > cameraX + 900) {
-            // Reposition enemy
+            // Remove old enemy and its arms
+            this.enemy.leftArm.destroy();
+            this.enemy.rightArm.destroy();
             this.enemy.destroy();
-            if (this.enemyMouth) {
-                this.matter.world.remove(this.enemyMouth);
-            }
 
             // Create new enemy ahead of player
             this.createEnemy(playerX + 400, this.groundTop - 50);
             return;
         }
 
-        // MUCH more aggressive enemy movement
+        // Calculate distance to player
         const dx = this.character.parts.torso.x - this.enemy.x;
-        const speed = 0.003; // 3x faster than before
+        const distance = Math.abs(dx);
 
-        // Apply force toward player
-        this.enemy.applyForce({ x: Math.sign(dx) * speed, y: 0 });
+        // STOP applying forces constantly - instead set velocity directly when needed
+        // reduce initial rush speed
+        if (distance > 100) {
+            // Slower initial speed
+            const speed = 0.05;
+            this.enemy.setVelocityX(Math.sign(dx) * speed);
 
-        // Update mouth position
-        if (this.enemyMouth) {
-            const mouthOffset = dx > 0 ? 30 : -30;
-            this.matter.body.setPosition(this.enemyMouth, {
-                x: this.enemy.x + mouthOffset,
-                y: this.enemy.y
-            });
+            const maxSpeed = 0.3;
+            if (Math.abs(this.enemy.body.velocity.x) > maxSpeed) {
+                this.enemy.setVelocityX(Math.sign(this.enemy.body.velocity.x) * maxSpeed);
+            }
+        } else {
+            // Stronger deceleration when close
+            this.enemy.setVelocityX(this.enemy.body.velocity.x * 0.5);
+        }
+
+        // Also make sure the enemy doesn't get too much vertical velocity
+        if (Math.abs(this.enemy.body.velocity.y) > 0.2) {
+            this.enemy.setVelocityY(this.enemy.body.velocity.y * 0.8);
         }
     }
 
@@ -663,7 +744,6 @@ class GameScene extends Phaser.Scene {
     // Collision Handling
     //-------------------------------------------------------------------------
 
-    // Update collision checks for finish line
     setupCollisions() {
         // Initialize torso ground contact tracker
         this.torsoGroundContact = null;
@@ -687,33 +767,110 @@ class GameScene extends Phaser.Scene {
                     return;
                 }
 
-                // Simplified finish line detection - check for ANY part
-                if (bodyA.label === 'finishLine' || bodyB.label === 'finishLine') {
-                    // Make sure one of the bodies is a character part
-                    const otherBody = bodyA.label === 'finishLine' ? bodyB : bodyA;
-                    if (otherBody.gameObject && otherBody.label) {
+                // Check for finish line collision
+                if ((bodyA.label === 'finishLine' && bodyB.gameObject &&
+                        Object.values(this.character.parts).includes(bodyB.gameObject)) ||
+                    (bodyB.label === 'finishLine' && bodyA.gameObject &&
+                        Object.values(this.character.parts).includes(bodyA.gameObject))) {
+
+                    // Only win if torso is close enough to finish line
+                    const distanceToFinish = Phaser.Math.Distance.Between(
+                        this.character.parts.torso.x,
+                        this.character.parts.torso.y,
+                        this.finishLine.x,
+                        this.finishLine.y
+                    );
+
+                    if (distanceToFinish < 150) {
                         this.winGame();
-                        return;
                     }
                 }
 
-                // More reliable enemy damage detection
-                if (bodyA.label === 'enemyMouth' || bodyB.label === 'enemyMouth') {
-                    const otherBody = bodyA.label === 'enemyMouth' ? bodyB : bodyA;
-                    if (otherBody.gameObject && otherBody.label &&
-                        (otherBody.label.includes('Arm') || otherBody.label.includes('Leg'))) {
+                // Check for player punch hitting enemy
+                const isPlayerArm = (body) => body.label &&
+                    (body.label === 'leftLowerArm' || body.label === 'rightLowerArm');
+                const isEnemy = (body) => body.label === 'enemy' || body.label === 'enemyArm';
 
-                        // Push player back
-                        this.character.parts.torso.applyForce({ x: -0.03, y: -0.01 });
+                if ((isPlayerArm(bodyA) && isEnemy(bodyB)) ||
+                    (isEnemy(bodyA) && isPlayerArm(bodyB))) {
 
-                        // Damage limb
-                        this.damageLimb(otherBody.gameObject);
+                    const arm = isPlayerArm(bodyA) ? bodyA.gameObject : bodyB.gameObject;
+                    const enemyPart = isEnemy(bodyA) ? bodyA.gameObject : bodyB.gameObject;
+
+                    // Calculate arm velocity for impact
+                    const armVelocity = arm.body.velocity;
+                    const impactSpeed = Math.sqrt(
+                        armVelocity.x * armVelocity.x +
+                        armVelocity.y * armVelocity.y
+                    );
+
+                    // Only register significant impacts
+                    if (impactSpeed > 3) {
+                        // Apply knockback to enemy
+                        const pushForce = 0.005 * impactSpeed;
+                        const direction = isPlayerArm(bodyA) ? 1 : -1;
+
+                        this.enemy.applyForce({
+                            x: direction * pushForce,
+                            y: -pushForce/2
+                        });
+
+                        // Visual feedback
+                        this.cameras.main.shake(100, 0.01);
+
+                        // Show hit effect
+                        this.showHitEffect(arm.x, arm.y);
+                    }
+                }
+
+                // Check for enemy arm hitting player
+                const isEnemyArm = (body) => body.label === 'enemyArm';
+                const isPlayerPart = (body) => body.gameObject &&
+                    Object.values(this.character.parts).includes(body.gameObject);
+
+                if ((isEnemyArm(bodyA) && isPlayerPart(bodyB)) ||
+                    (isPlayerPart(bodyA) && isEnemyArm(bodyB))) {
+
+                    // Only register hit if it's been a while since last hit
+                    if (!this.lastPlayerHit || this.time.now - this.lastPlayerHit > 420) {
+                        this.lastPlayerHit = this.time.now;
+
+                        // Decrease health
+                        this.playerHealth--;
+
+                        // Update display
+                        if (this.healthDisplay) {
+                            this.healthDisplay.setText(`Health: ${this.playerHealth}`);
+                        }
+
+                        // Game over if no health left
+                        if (this.playerHealth <= 0) {
+                            this.gameOver("Hit too many times!");
+                            return;
+                        }
+
+                        // Apply knockback to player
+                        const knockbackForce = 0.04;
+                        this.character.parts.torso.applyForce({
+                            x: -knockbackForce,
+                            y: -knockbackForce/2
+                        });
+
+                        // Visual feedback
+                        this.cameras.main.shake(150, 0.02);
+
+                        // Show hit effect
+                        const hitPos = isEnemyArm(bodyA) ?
+                            { x: bodyA.gameObject.x, y: bodyA.gameObject.y } :
+                            { x: bodyB.gameObject.x, y: bodyB.gameObject.y };
+
+                        this.showHitEffect(hitPos.x, hitPos.y);
                     }
                 }
             });
         });
 
-        // Handle collision end for ground contact
+        // Handle collision end
         this.matter.world.on('collisionend', (event) => {
             event.pairs.forEach((pair) => {
                 if (this.isCollisionBetween(pair, 'torso', 'ground')) {
@@ -726,6 +883,38 @@ class GameScene extends Phaser.Scene {
     isCollisionBetween(pair, labelA, labelB) {
         return (pair.bodyA.label === labelA && pair.bodyB.label === labelB) ||
             (pair.bodyA.label === labelB && pair.bodyB.label === labelA);
+    }
+
+    // Add hit effect method
+    showHitEffect(x, y) {
+        // Create a hit effect
+        const hitEffect = this.add.circle(x, y, 15, 0xffffff, 0.7);
+
+        // Expand and fade
+        this.tweens.add({
+            targets: hitEffect,
+            scale: 2,
+            alpha: 0,
+            duration: 200,
+            onComplete: () => hitEffect.destroy()
+        });
+
+        // Add a hit text
+        // const hitText = this.add.text(x, y - 20, 'HIT!', {
+        //     fontSize: '18px',
+        //     fill: '#ffffff',
+        //     backgroundColor: '#ff0000aa',
+        //     padding: { x: 5, y: 2 }
+        // }).setOrigin(0.5);
+
+        // // Fade out
+        // this.tweens.add({
+        //     targets: hitText,
+        //     y: hitText.y - 30,
+        //     alpha: 0,
+        //     duration: 300,
+        //     onComplete: () => hitText.destroy()
+        // });
     }
 
     //-------------------------------------------------------------------------
@@ -751,25 +940,28 @@ class GameScene extends Phaser.Scene {
     }
 
     togglePause() {
+        console.log("Toggle pause called"); // Debug output
         this.isPaused = !this.isPaused;
 
         if (this.isPaused) {
-            // Pause physics
+            // Stop physics
             this.matter.world.enabled = false;
 
-            // Add pause overlay
-            this.pauseText = this.add.text(400, 300, 'PAUSED\nPress ESC to resume', {
-                fontSize: '32px',
-                fill: '#fff',
-                backgroundColor: '#000',
-                padding: { x: 20, y: 10 },
-                align: 'center'
-            }).setOrigin(0.5).setScrollFactor(0).setDepth(1000);
+            // Show pause text
+            if (!this.pauseText) {
+                this.pauseText = this.add.text(400, 300, 'PAUSED\nPress ESC to resume', {
+                    fontSize: '32px',
+                    fill: '#fff',
+                    backgroundColor: '#000',
+                    padding: { x: 20, y: 10 },
+                    align: 'center'
+                }).setOrigin(0.5).setScrollFactor(0).setDepth(1000);
+            }
         } else {
             // Resume physics
             this.matter.world.enabled = true;
 
-            // Remove pause overlay
+            // Remove pause text
             if (this.pauseText) {
                 this.pauseText.destroy();
                 this.pauseText = null;
@@ -801,10 +993,18 @@ class GameScene extends Phaser.Scene {
             }
         }
 
-        // More sensitive rotation check - fall over more easily
-        if (this.character.parts.torso && Math.abs(this.character.parts.torso.rotation) > 1.3) { // Reduced from 1.8
-            this.gameOver("Character fell over!");
-            return;
+        // Replace the rotation check in checkGameState()
+        // Check for torso on ground for longer
+        if (this.torsoGroundContact) {
+            // Instead of rotation, check if torso is lying on its side
+            const torsoVelocity = this.character.parts.torso.body.velocity;
+            const isNotMoving = Math.abs(torsoVelocity.x) < 0.5 && Math.abs(torsoVelocity.y) < 0.5;
+
+            // If not moving for a while and on ground, game over
+            if (isNotMoving && this.time.now - this.torsoGroundContact.time > 500) {
+                this.gameOver("Character fell down!");
+                return;
+            }
         }
 
         // Check if enemy is very close to torso
@@ -926,17 +1126,13 @@ class GameScene extends Phaser.Scene {
         }).setOrigin(0.5);
         this.distanceText.setScrollFactor(0); // Fix to camera
 
-        // Add limb health indicator
-        this.healthText = this.add.text(400, 100, 'Limbs: 8/8', {
+        this.healthDisplay = this.add.text(400, 130, 'Health: 3', {
             fontSize: '16px',
             fill: '#fff',
             backgroundColor: '#000000AA',
             padding: { x: 10, y: 5 }
         }).setOrigin(0.5);
-        this.healthText.setScrollFactor(0);
-
-        // Update limb health in update function
-        this.updateLimbHealth = true;
+        this.healthDisplay.setScrollFactor(0);
     }
 
     // Show simplified limb labels

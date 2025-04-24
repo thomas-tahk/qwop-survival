@@ -9,7 +9,7 @@ const config = {
         default: 'matter',
         matter: {
             gravity: { y: 0.5 }, // Lower gravity for more control
-            debug: true, // Show physics bodies
+            debug: false, // Show physics bodies
             debugBodyColor: 0xffffff, // White debug bodies
             debugWireframes: true,
             debugShowInternalEdges: true
