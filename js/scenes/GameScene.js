@@ -330,42 +330,35 @@ class GameScene extends Phaser.Scene {
     handleCharacterControl() {
         if (!this.gameActive || this.isPaused) return;
 
-        // QWOP controls with MUCH higher forces
-        const legForce = 0.1;   // 2.5x higher force
-        const armForce = 0.05;  // 2x higher force
+        // Simplified QWOP controls with higher forces
+        const legForce = 0.08;
+        const armForce = 0.04;
 
         // Thigh controls (Q and W)
         if (this.keys.q.isDown) {
-            // Q: Right thigh forward, left thigh backward
             this.character.parts.rightUpperLeg.applyForce({ x: legForce, y: 0 });
             this.character.parts.leftUpperLeg.applyForce({ x: -legForce/2, y: 0 });
         }
 
         if (this.keys.w.isDown) {
-            // W: Left thigh forward, right thigh backward
             this.character.parts.leftUpperLeg.applyForce({ x: legForce, y: 0 });
             this.character.parts.rightUpperLeg.applyForce({ x: -legForce/2, y: 0 });
         }
 
         // Calf controls (O and P)
         if (this.keys.o.isDown) {
-            // O: Right calf forward, left calf backward
             this.character.parts.rightLowerLeg.applyForce({ x: legForce, y: -legForce/4 });
             this.character.parts.leftLowerLeg.applyForce({ x: -legForce/2, y: 0 });
         }
 
         if (this.keys.p.isDown) {
-            // P: Left calf forward, right calf backward
             this.character.parts.leftLowerLeg.applyForce({ x: legForce, y: -legForce/4 });
             this.character.parts.rightLowerLeg.applyForce({ x: -legForce/2, y: 0 });
         }
 
-        // Space for arm control - higher force and shorter cooldown
+        // Space for arm control - without distracting text
         if (this.keys.space.isDown) {
-            const cooldownTime = 300; // Reduced from 500ms to 300ms
-
-            if (!this.lastArmSwing || this.time.now - this.lastArmSwing > cooldownTime) {
-                // Apply much stronger forces
+            if (!this.lastArmSwing || this.time.now - this.lastArmSwing > 300) {
                 if (this.character.parts.leftUpperArm && this.character.parts.leftUpperArm.active) {
                     this.character.parts.leftUpperArm.applyForce({ x: armForce, y: -armForce });
                 }
@@ -375,31 +368,7 @@ class GameScene extends Phaser.Scene {
                 }
 
                 this.lastArmSwing = this.time.now;
-                this.cameras.main.shake(100, 0.01); // More noticeable shake
-
-                // Add punch effect text
-                if (!this.punchText) {
-                    this.punchText = this.add.text(400, 200, "Punch!", {
-                        fontSize: '24px', // Larger text
-                        fill: '#ffffff',
-                        backgroundColor: '#ff6600ee', // More opaque
-                        padding: { x: 10, y: 5 }
-                    }).setOrigin(0.5);
-                    this.punchText.setScrollFactor(0);
-
-                    this.tweens.add({
-                        targets: this.punchText,
-                        alpha: 0,
-                        y: 180,
-                        duration: 300,
-                        onComplete: () => {
-                            if (this.punchText) {
-                                this.punchText.destroy();
-                                this.punchText = null;
-                            }
-                        }
-                    });
-                }
+                // No shake or text display
             }
         }
     }
@@ -690,74 +659,33 @@ class GameScene extends Phaser.Scene {
                     return;
                 }
 
-                // Check if ANY part of the character touches the finish line
-                if ((bodyA.label === 'finishLine' && bodyB.gameObject &&
-                        Object.values(this.character.parts).includes(bodyB.gameObject)) ||
-                    (bodyB.label === 'finishLine' && bodyA.gameObject &&
-                        Object.values(this.character.parts).includes(bodyA.gameObject))) {
-
-                    console.log("Finish line reached!"); // Debug output
-                    this.winGame();
+                // Simplified finish line detection - check for ANY part
+                if (bodyA.label === 'finishLine' || bodyB.label === 'finishLine') {
+                    // Make sure one of the bodies is a character part
+                    const otherBody = bodyA.label === 'finishLine' ? bodyB : bodyA;
+                    if (otherBody.gameObject && otherBody.label) {
+                        this.winGame();
+                        return;
+                    }
                 }
 
-                // Check for arm collisions with enemy - more effective pushback
-                const isArm = (body) => body.label && body.label.includes('Arm');
-                const isEnemy = (body) => body.label === 'enemy';
-
-                if ((isArm(bodyA) && isEnemy(bodyB)) || (isEnemy(bodyA) && isArm(bodyB))) {
-                    const enemy = isEnemy(bodyA) ? bodyA.gameObject : bodyB.gameObject;
-
-                    // Strong pushback when hitting enemy with arms
-                    const pushForce = 0.003; // Increased for visual effect
-                    const direction = isArm(bodyA) ? 1 : -1;
-
-                    // Apply push force to enemy
-                    enemy.applyForce({ x: direction * pushForce, y: -pushForce/2 });
-
-                    // Visual feedback
-                    this.cameras.main.shake(200, 0.01);
-
-                    // Flash enemy to show impact
-                    this.tweens.add({
-                        targets: enemy,
-                        alpha: 0.5,
-                        duration: 50,
-                        yoyo: true,
-                        repeat: 3
-                    });
-                }
-
-                // Check for enemy mouth contact with character parts
+                // More reliable enemy damage detection
                 if (bodyA.label === 'enemyMouth' || bodyB.label === 'enemyMouth') {
                     const otherBody = bodyA.label === 'enemyMouth' ? bodyB : bodyA;
-
-                    // More aggressive check for ANY limb part
                     if (otherBody.gameObject && otherBody.label &&
                         (otherBody.label.includes('Arm') || otherBody.label.includes('Leg'))) {
 
-                        // Apply strong force to torso for feedback
-                        if (this.character.parts.torso) {
-                            this.character.parts.torso.applyForce({
-                                x: -0.05, // Much stronger pushback
-                                y: -0.02
-                            });
-                        }
+                        // Push player back
+                        this.character.parts.torso.applyForce({ x: -0.03, y: -0.01 });
 
-                        // Damage with more dramatic feedback
+                        // Damage limb
                         this.damageLimb(otherBody.gameObject);
-                        this.cameras.main.shake(300, 0.05); // More intense shake
-                        this.cameras.main.flash(200, 255, 0, 0, 0.5); // More visible flash
-
-                        // Make sure the enemy isn't stuck
-                        if (this.enemy) {
-                            this.enemy.applyForce({ x: -0.01, y: -0.005 });
-                        }
                     }
                 }
             });
         });
 
-        // Add collision end detection
+        // Handle collision end for ground contact
         this.matter.world.on('collisionend', (event) => {
             event.pairs.forEach((pair) => {
                 if (this.isCollisionBetween(pair, 'torso', 'ground')) {
@@ -798,23 +726,22 @@ class GameScene extends Phaser.Scene {
         this.isPaused = !this.isPaused;
 
         if (this.isPaused) {
-            // Pause the game
+            // Pause physics
             this.matter.world.enabled = false;
 
-            // Add pause text
+            // Add pause overlay
             this.pauseText = this.add.text(400, 300, 'PAUSED\nPress ESC to resume', {
                 fontSize: '32px',
                 fill: '#fff',
                 backgroundColor: '#000',
                 padding: { x: 20, y: 10 },
                 align: 'center'
-            }).setOrigin(0.5);
-            this.pauseText.setDepth(100);
+            }).setOrigin(0.5).setScrollFactor(0).setDepth(1000);
         } else {
-            // Resume the game
+            // Resume physics
             this.matter.world.enabled = true;
 
-            // Remove pause text if it exists
+            // Remove pause overlay
             if (this.pauseText) {
                 this.pauseText.destroy();
                 this.pauseText = null;
@@ -873,8 +800,12 @@ class GameScene extends Phaser.Scene {
         this.gameActive = false;
         console.log('Game over:', reason);
 
-        // Freeze physics
+        // Completely disable physics to prevent any processing
         this.matter.world.enabled = false;
+
+        // Game over overlay
+        const overlay = this.add.rectangle(0, 0, 2000, 1200, 0x000000, 0.5)
+            .setOrigin(0).setScrollFactor(0).setDepth(900);
 
         // Add game over text
         this.add.text(400, 300, 'GAME OVER', {
@@ -882,7 +813,7 @@ class GameScene extends Phaser.Scene {
             fill: '#fff',
             backgroundColor: '#880000',
             padding: { x: 20, y: 10 }
-        }).setOrigin(0.5).setDepth(100);
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(1000);
 
         // Add reason text
         this.add.text(400, 350, reason, {
@@ -890,7 +821,7 @@ class GameScene extends Phaser.Scene {
             fill: '#fff',
             backgroundColor: '#000',
             padding: { x: 10, y: 5 }
-        }).setOrigin(0.5).setDepth(100);
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(1000);
 
         // Add restart instructions
         this.add.text(400, 400, 'Press SPACE to try again', {
@@ -898,7 +829,7 @@ class GameScene extends Phaser.Scene {
             fill: '#fff',
             backgroundColor: '#000',
             padding: { x: 10, y: 5 }
-        }).setOrigin(0.5).setDepth(100);
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(1000);
 
         // Allow restart with spacebar
         this.input.keyboard.once('keydown-SPACE', () => {
@@ -912,8 +843,12 @@ class GameScene extends Phaser.Scene {
         this.gameActive = false;
         console.log('You win!');
 
-        // Freeze physics
+        // Completely disable physics to prevent any processing
         this.matter.world.enabled = false;
+
+        // Win overlay
+        const overlay = this.add.rectangle(0, 0, 2000, 1200, 0x000000, 0.5)
+            .setOrigin(0).setScrollFactor(0).setDepth(900);
 
         // Add win text
         this.add.text(400, 300, 'YOU WIN!', {
@@ -921,7 +856,7 @@ class GameScene extends Phaser.Scene {
             fill: '#fff',
             backgroundColor: '#00aa00',
             padding: { x: 20, y: 10 }
-        }).setOrigin(0.5).setDepth(100);
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(1000);
 
         // Add restart instructions
         this.add.text(400, 400, 'Press SPACE to play again', {
@@ -929,7 +864,7 @@ class GameScene extends Phaser.Scene {
             fill: '#fff',
             backgroundColor: '#00aa00',
             padding: { x: 10, y: 5 }
-        }).setOrigin(0.5).setDepth(100);
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(1000);
 
         // Allow restart with spacebar
         this.input.keyboard.once('keydown-SPACE', () => {
